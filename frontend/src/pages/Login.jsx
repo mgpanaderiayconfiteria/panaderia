@@ -89,12 +89,17 @@ const styles = {
     textAlign: 'center'
   },
   logoContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: '24px'
   },
   logo: {
-    width: '90px',
+    width: '160px',
     height: 'auto',
-    marginBottom: '10px'
+    marginBottom: '12px',
+    objectFit: 'contain'
   },
   title: {
     margin: 0,
