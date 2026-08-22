@@ -31,6 +31,24 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+// Middleware Logger para registrar cada petición en los logs de Render
+app.use((req, res, next) => {
+  const start = Date.now();
+  const { method, originalUrl } = req;
+  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
+  console.log(`📥 [INCOMING] ${method} ${originalUrl} - IP: ${ip}`);
+
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    const status = res.statusCode;
+    const icon = status >= 400 ? '❌' : '✅';
+    console.log(`${icon} [OUTGOING] ${method} ${originalUrl} -> Status: ${status} (${duration}ms)`);
+  });
+
+  next();
+});
+
 // Rutas de la API
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
@@ -96,6 +114,7 @@ app.get('/', (req, res) => {
 
 // Capturador de rutas 404 (evita responder con HTML cuando falla una ruta API)
 app.use((req, res, next) => {
+  console.warn(`⚠️ [404] Ruta no encontrada: ${req.originalUrl}`);
   res.status(404).json({ message: `La ruta ${req.originalUrl} no existe en el servidor` });
 });
 
