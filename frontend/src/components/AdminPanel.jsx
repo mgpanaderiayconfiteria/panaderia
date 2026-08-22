@@ -38,7 +38,7 @@ const AdminPanel = () => {
 
   return (
     <div style={styles.dashboardContainer}>
-      {/* Top Navigation Bar */}
+      {/* Barra de navegación superior */}
       <nav style={styles.topNav}>
         <div style={styles.navLeft}>
           <div style={styles.logoBadge}>MG</div>
@@ -46,7 +46,7 @@ const AdminPanel = () => {
             style={{ ...styles.navLink, ...(activeTab === 'dashboard' ? styles.navLinkActive : {}) }}
             onClick={() => setActiveTab('dashboard')}
           >
-            Dashboard
+            Panel de Control
           </span>
           <span 
             style={{ ...styles.navLink, ...(activeTab === 'users' ? styles.navLinkActive : {}) }}
@@ -70,7 +70,7 @@ const AdminPanel = () => {
         </main>
       )}
 
-      {/* Vista principal de Dashboard limpia */}
+      {/* Vista principal del Panel de Control */}
       {activeTab === 'dashboard' && (
         <main style={styles.mainContent}>
           <div style={styles.headerRow}>
@@ -82,7 +82,7 @@ const AdminPanel = () => {
           </div>
 
           <div style={styles.topGrid}>
-            {/* Daily Earnings Overview */}
+            {/* Resumen de Ventas Diarias */}
             <div style={styles.card}>
               <div style={styles.cardHeader}>
                 <h2 style={styles.cardTitle}>RESUMEN DE VENTAS DIARIAS</h2>
@@ -107,12 +107,12 @@ const AdminPanel = () => {
               </div>
             </div>
 
-            {/* Sales Breakdown by Product */}
+            {/* Ventas por Categoría / Productos Destacados */}
             <div style={styles.card}>
-              <h2 style={styles.cardTitle}>VENTAS POR CATEGORÍA</h2>
+              <h2 style={styles.cardTitle}>PRODUCTOS MÁS VENDIDOS</h2>
               <div style={styles.donutGrid}>
                 <div style={styles.topProductsTable}>
-                  <div style={styles.topProdHeader}><span>Producto Top</span><span>Vendidos</span></div>
+                  <div style={styles.topProdHeader}><span>Producto</span><span>Vendidos</span></div>
                   {products.length === 0 ? (
                     <div style={styles.emptyRow}>Sin ventas registradas</div>
                   ) : (
@@ -127,7 +127,7 @@ const AdminPanel = () => {
               </div>
             </div>
 
-            {/* Trends & Alerts Sidebar */}
+            {/* Tendencias y Alertas */}
             <div style={styles.card}>
               <h2 style={styles.cardTitle}>ALERTAS DE STOCK</h2>
               <div style={styles.sidebarSection}>
@@ -178,7 +178,7 @@ const AdminPanel = () => {
             </form>
           </div>
 
-          {/* Tabla de análisis de rentabilidad limpia */}
+          {/* Tabla de análisis de rentabilidad */}
           <div style={styles.card}>
             <h2 style={styles.cardTitle}>ANÁLISIS DE RENTABILIDAD DE PRODUCTOS</h2>
             {products.length === 0 ? (
