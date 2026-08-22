@@ -27,7 +27,7 @@ app.use(cors({
   credentials: true
 }));
 
-// Middlewares para JSON e imágenes
+// Middlewares para parseo de body e imágenes
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
@@ -35,9 +35,19 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/products', require('./routes/productRoutes'));
-app.use('/api/orders', require('./routes/orders'));
 
-// Función segura para inicializar la cuenta Admin
+// Manejo seguro de la ruta de órdenes según el nombre de tu archivo
+try {
+  app.use('/api/orders', require('./routes/orders'));
+} catch (e) {
+  try {
+    app.use('/api/orders', require('./routes/orderRoutes'));
+  } catch (err) {
+    console.warn('⚠️ No se encontró la ruta de órdenes (orders/orderRoutes)');
+  }
+}
+
+// Función para inicializar la cuenta Admin
 const initAdmin = async () => {
   try {
     const adminEmail = (process.env.ADMIN_EMAIL || 'mgpanaderiayconfiteria@gmail.com').trim().toLowerCase();
@@ -67,16 +77,26 @@ const initAdmin = async () => {
 };
 
 // Conexión a MongoDB Atlas
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => {
-    console.log('Conexión exitosa a MongoDB Atlas 🍃');
-    initAdmin();
-  })
-  .catch(err => console.error('Error al conectar a MongoDB:', err));
+const mongoUri = process.env.MONGO_URI;
+if (!mongoUri) {
+  console.error('❌ ERROR CRÍTICO: Falta la variable MONGO_URI en el archivo .env');
+} else {
+  mongoose.connect(mongoUri)
+    .then(() => {
+      console.log('Conexión exitosa a MongoDB Atlas 🍃');
+      initAdmin();
+    })
+    .catch(err => console.error('Error al conectar a MongoDB:', err));
+}
 
 // Ruta raíz de prueba
 app.get('/', (req, res) => {
   res.send('API de Panadería funcionando 🚀');
+});
+
+// Capturador de rutas 404 (evita responder con HTML cuando falla una ruta API)
+app.use((req, res, next) => {
+  res.status(404).json({ message: `La ruta ${req.originalUrl} no existe en el servidor` });
 });
 
 // Manejador global de errores

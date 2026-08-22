@@ -2,7 +2,7 @@ import React, { createContext, useState, useEffect } from 'react';
 
 export const ProductContext = createContext();
 
-// Si estás en producción usa la URL pública de Render, de lo contrario usa localhost:5000
+// Selección dinámica del servidor backend
 const BASE_URL = window.location.hostname === 'localhost' 
   ? 'http://localhost:5000' 
   : 'https://mgpanaderia.onrender.com';
@@ -16,7 +16,12 @@ export const ProductProvider = ({ children }) => {
   const fetchProducts = async () => {
     try {
       const response = await fetch(API_URL);
-      if (!response.ok) throw new Error('Error al obtener los productos');
+      const contentType = response.headers.get('content-type');
+
+      if (!response.ok || !contentType || !contentType.includes('application/json')) {
+        throw new Error('Respuesta no válida del servidor backend');
+      }
+
       const data = await response.json();
       setProducts(data);
     } catch (error) {
@@ -39,9 +44,12 @@ export const ProductProvider = ({ children }) => {
         body: JSON.stringify(productData)
       });
 
-      if (!response.ok) throw new Error('Error al crear el producto');
-      const savedProduct = await response.json();
+      const contentType = response.headers.get('content-type');
+      if (!response.ok || !contentType || !contentType.includes('application/json')) {
+        throw new Error('El servidor no devolvió un objeto JSON válido');
+      }
 
+      const savedProduct = await response.json();
       setProducts((prev) => [savedProduct, ...prev]);
     } catch (error) {
       console.error('Error en addProduct:', error);
@@ -59,7 +67,11 @@ export const ProductProvider = ({ children }) => {
         body: JSON.stringify(updatedData)
       });
 
-      if (!response.ok) throw new Error('Error al actualizar el producto');
+      const contentType = response.headers.get('content-type');
+      if (!response.ok || !contentType || !contentType.includes('application/json')) {
+        throw new Error('Error al actualizar el producto en el servidor');
+      }
+
       const updatedProduct = await response.json();
 
       setProducts((prev) =>

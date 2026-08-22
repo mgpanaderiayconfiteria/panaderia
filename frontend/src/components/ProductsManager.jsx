@@ -18,34 +18,31 @@ const ProductsManager = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name || !formData.price) return;
 
+    const payload = {
+      name: formData.name,
+      category: formData.category,
+      price: parseFloat(formData.price),
+      cogs: parseFloat(formData.cogs || 0),
+      stock: parseInt(formData.stock || 0, 10)
+    };
+
     if (editingId) {
-      updateProduct(editingId, {
-        name: formData.name,
-        category: formData.category,
-        price: parseFloat(formData.price),
-        cogs: parseFloat(formData.cogs || 0),
-        stock: parseInt(formData.stock || 0, 10)
-      });
+      await updateProduct(editingId, payload);
       setEditingId(null);
     } else {
-      addProduct({
-        name: formData.name,
-        category: formData.category,
-        price: parseFloat(formData.price),
-        cogs: parseFloat(formData.cogs || 0),
-        stock: parseInt(formData.stock || 0, 10)
-      });
+      await addProduct(payload);
     }
 
     setFormData({ name: '', category: 'Panadería', price: '', cogs: '', stock: '' });
   };
 
   const handleEdit = (product) => {
-    setEditingId(product.id || product._id);
+    // MongoDB usa _id de forma nativa
+    setEditingId(product._id || product.id);
     setFormData({
       name: product.name,
       category: product.category || 'Panadería',
@@ -53,6 +50,12 @@ const ProductsManager = () => {
       cogs: product.cogs || '',
       stock: product.stock || ''
     });
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm('¿Estás seguro de que deseas eliminar este producto?')) {
+      await deleteProduct(id);
+    }
   };
 
   const handleCancelEdit = () => {
@@ -168,7 +171,7 @@ const ProductsManager = () => {
             </thead>
             <tbody>
               {products.map((p) => {
-                const prodId = p.id || p._id;
+                const prodId = p._id || p.id;
                 return (
                   <tr key={prodId} style={styles.trBody}>
                     <td style={styles.td}><strong>{p.name}</strong></td>
@@ -190,7 +193,7 @@ const ProductsManager = () => {
                         Editar
                       </button>
                       <button
-                        onClick={() => deleteProduct(prodId)}
+                        onClick={() => handleDelete(prodId)}
                         style={styles.btnDelete}
                       >
                         Eliminar
