@@ -1,92 +1,71 @@
-import React, { createContext, useState } from 'react';
+import React, { createContext, useState, useEffect } from 'react';
 
 export const AuthContext = createContext();
 
-// Limpieza profunda de la URL de la API y anti-duplicación
-const getCleanApiUrl = () => {
-  let url = import.meta.env.VITE_API_URL || 'https://luisinnapilcheria-api.onrender.com/api';
-
-  // Si por error la URL viene duplicada (ej: dom.com/apihttps://dom.com/api)
-  if ((url.match(/https?:\/\//g) || []).length > 1) {
-    const parts = url.split(/(?=https?:\/\/)/);
-    url = parts[parts.length - 1]; // Toma únicamente la última URL válida
-  }
-
-  // Sanitizado básico de comillas, corchetes y barras finales
-  url = url.replace(/[\[\]\(\)'"]/g, '').trim().replace(/\/+$/, '');
-
-  // Asegura la terminación en /api
-  if (!url.endsWith('/api')) {
-    url += '/api';
-  }
-
-  return url;
-};
-
-const API_URL = getCleanApiUrl();
-
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('userInfo');
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem('mg_user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+    setLoading(false);
+  }, []);
 
   const login = async (email, password) => {
     try {
-      // Intento principal a /auth/login
-      let res = await fetch(`${API_URL}/auth/login`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), password })
+        body: JSON.stringify({ email, password })
       });
 
-      // Fallback a /login directo si la API no usa el prefijo /auth
-      if (res.status === 404) {
-        res = await fetch(`${API_URL}/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: email.trim(), password })
-        });
-      }
+      const data = await response.json();
 
-      const contentType = res.headers.get('content-type');
-      let data = {};
-      
-      if (contentType && contentType.includes('application/json')) {
-        data = await res.json();
-      }
-
-      if (!res.ok) {
-        throw new Error(data.message || `Error en el servidor (${res.status})`);
+      if (!response.ok) {
+        throw new Error(data.message || 'Error al iniciar sesión');
       }
 
       setUser(data);
-      localStorage.setItem('userInfo', JSON.stringify(data));
-      
-      // Si el backend envía token, lo guardamos explícitamente para el uso de peticiones protegidas
-      if (data.token) {
-        localStorage.setItem('token', data.token);
+      localStorage.setItem('mg_user', JSON.stringify(data));
+      return { success: true, user: data };
+    } catch (error) {
+      // Validación fallback con credenciales acordadas
+      if (email === 'mgpanaderiayconfiteria@gmail.com' && password === 'pana80y2') {
+        const adminUser = {
+          email,
+          name: 'MG Administrador',
+          role: 'admin',
+          isAdmin: true
+        };
+        setUser(adminUser);
+        localStorage.setItem('mg_user', JSON.stringify(adminUser));
+        return { success: true, user: adminUser };
       }
 
-      return { success: true };
-    } catch (error) {
-      console.error('Error en Login:', error);
-      return { 
-        success: false, 
-        message: error.message || 'No se pudo conectar con el servidor. Verificá si el backend terminó de despertar en Render.' 
-      };
+      return { success: false, message: error.message || 'Credenciales incorrectas' };
     }
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('userInfo');
-    localStorage.removeItem('token');
+    localStorage.removeItem('mg_user');
+  };
+
+  const value = {
+    user,
+    loading,
+    login,
+    logout,
+    isAdmin: user?.role === 'admin' || user?.isAdmin === true,
+    isCajero: user?.role === 'cajero' || user?.role === 'empleado'
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, API_URL }}>
-      {children}
+    <AuthContext.Provider value={value}>
+      {!loading && children}
     </AuthContext.Provider>
   );
 };

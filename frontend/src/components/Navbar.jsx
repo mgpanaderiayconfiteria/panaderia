@@ -1,68 +1,83 @@
 import React, { useContext } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { CartContext } from '../context/CartContext';
+import { Link, useNavigate } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext';
 
-export default function Navbar() {
-  const { cart } = useContext(CartContext);
-  const location = useLocation();
+const Navbar = () => {
+  const { user, isAdmin, logout } = useContext(AuthContext);
+  const navigate = useNavigate();
 
-  // Calcular la cantidad total de artículos en el carrito
-  const totalItems = cart ? cart.reduce((acc, item) => acc + (item.quantity || 1), 0) : 0;
+  if (!isAdmin) return null;
 
-  const isActive = (path) => location.pathname === path;
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   return (
-    <header className="bg-white border-b border-rose-100 sticky top-0 z-40">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3.5 flex justify-between items-center">
-        
-        {/* NAVEGACIÓN */}
-        <nav className="flex items-center gap-4 sm:gap-6 text-xs uppercase tracking-wider font-medium">
-          <Link 
-            to="/" 
-            className={`transition-colors duration-200 ${
-              isActive('/') ? 'text-rose-900 font-semibold' : 'text-stone-600 hover:text-stone-900'
-            }`}
-          >
-            Inicio
-          </Link>
-
-          <Link 
-            to="/catalogo" 
-            className={`transition-colors duration-200 ${
-              isActive('/catalogo') ? 'text-rose-900 font-semibold' : 'text-stone-600 hover:text-stone-900'
-            }`}
-          >
-            Catálogo
-          </Link>
-
-          <Link 
-            to="/carrito" 
-            className={`relative flex items-center gap-1.5 transition-colors duration-200 ${
-              isActive('/carrito') ? 'text-rose-900 font-semibold' : 'text-stone-600 hover:text-stone-900'
-            }`}
-          >
-            <span>Carrito</span>
-            <span className="text-sm">🛍️</span>
-            {totalItems > 0 && (
-              <span className="bg-stone-900 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center -ml-1">
-                {totalItems}
-              </span>
-            )}
-          </Link>
-
-          <Link 
-            to="/admin" 
-            className={`transition-colors duration-200 text-[11px] px-2.5 py-1 rounded-xs border ${
-              isActive('/admin') 
-                ? 'bg-stone-900 text-white border-stone-900' 
-                : 'border-stone-200 text-stone-500 hover:border-stone-400 hover:text-stone-800'
-            }`}
-          >
-            Admin
-          </Link>
-        </nav>
-
+    <nav style={styles.nav}>
+      <div style={styles.left}>
+        <img src="/logo.png" alt="MG Logo" style={styles.logo} />
+        <span style={styles.brand}>MG PANADERÍA | Admin</span>
       </div>
-    </header>
+      <div style={styles.right}>
+        <Link to="/admin" style={styles.link}>Dashboard</Link>
+        <Link to="/caja" style={styles.link}>Vista Caja</Link>
+        <span style={styles.userInfo}>👤 {user?.name || 'Admin'}</span>
+        <button onClick={handleLogout} style={styles.btnLogout}>Cerrar Sesión</button>
+      </div>
+    </nav>
   );
-}
+};
+
+const styles = {
+  nav: {
+    backgroundColor: '#0f2337',
+    color: '#ffffff',
+    padding: '10px 20px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+  },
+  left: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px'
+  },
+  logo: {
+    height: '30px',
+    width: 'auto'
+  },
+  brand: {
+    fontWeight: 'bold',
+    fontSize: '0.95rem',
+    letterSpacing: '0.5px'
+  },
+  right: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '20px'
+  },
+  link: {
+    color: '#cbd5e1',
+    textDecoration: 'none',
+    fontSize: '0.85rem',
+    fontWeight: '600'
+  },
+  userInfo: {
+    fontSize: '0.85rem',
+    color: '#94a3b8'
+  },
+  btnLogout: {
+    backgroundColor: '#c62828',
+    color: '#ffffff',
+    border: 'none',
+    padding: '6px 12px',
+    borderRadius: '4px',
+    fontSize: '0.8rem',
+    fontWeight: 'bold',
+    cursor: 'pointer'
+  }
+};
+
+export default Navbar;
