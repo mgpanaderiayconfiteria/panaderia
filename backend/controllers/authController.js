@@ -6,24 +6,33 @@ const generateToken = (id) => {
 };
 
 exports.registerUser = async (req, res) => {
-  const { name, email, password, role } = req.body;
+  const { name, username, email, password, role } = req.body;
   try {
-    const cleanEmail = email ? email.trim().toLowerCase() : '';
-    
-    const userExists = await User.findOne({ email: cleanEmail });
+    const cleanUsername = username ? username.trim().toLowerCase() : null;
+    const cleanEmail = email ? email.trim().toLowerCase() : `${cleanUsername}@panaderia.local`;
+
+    const userExists = await User.findOne({
+      $or: [
+        { email: cleanEmail },
+        ...(cleanUsername ? [{ username: cleanUsername }] : [])
+      ]
+    });
+
     if (userExists) return res.status(400).json({ message: 'El usuario ya existe' });
 
-    const user = await User.create({ 
-      name: name ? name.trim() : '', 
-      email: cleanEmail, 
-      password, 
+    const user = await User.create({
+      name: name ? name.trim() : '',
+      username: cleanUsername,
+      email: cleanEmail,
+      password,
       role: role || 'cajero',
       isAdmin: role === 'admin'
     });
-    
+
     res.status(201).json({
       _id: user._id,
       name: user.name,
+      username: user.username,
       email: user.email,
       role: user.role,
       isAdmin: user.isAdmin,
@@ -36,16 +45,22 @@ exports.registerUser = async (req, res) => {
 };
 
 exports.loginUser = async (req, res) => {
-  const { email, password } = req.body;
+  const { loginInput, email, username, password } = req.body;
   try {
-    if (!email || !password) {
-      return res.status(400).json({ message: 'Por favor ingresá email y contraseña' });
+    // Permite recibir la identificación mediante el campo genérico loginInput, email o username
+    const identifier = (loginInput || username || email || '').trim().toLowerCase();
+
+    if (!identifier || !password) {
+      return res.status(400).json({ message: 'Por favor ingresá usuario/email y contraseña' });
     }
 
-    const cleanEmail = email.trim().toLowerCase();
-    
-    // Traemos explícitamente el campo password que tiene select: false
-    const user = await User.findOne({ email: cleanEmail }).select('+password');
+    // Busca por coincidencia exacta en el campo username o en email
+    const user = await User.findOne({
+      $or: [
+        { username: identifier },
+        { email: identifier }
+      ]
+    }).select('+password');
 
     if (!user) {
       return res.status(401).json({ message: 'Usuario no encontrado' });
@@ -57,6 +72,7 @@ exports.loginUser = async (req, res) => {
       return res.json({
         _id: user._id,
         name: user.name,
+        username: user.username,
         email: user.email,
         role: user.role,
         isAdmin: user.isAdmin || user.role === 'admin',

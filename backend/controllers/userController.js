@@ -13,21 +13,30 @@ exports.getUsers = async (req, res) => {
 
 // Crear/Dar de Alta un nuevo usuario o empleado
 exports.createUser = async (req, res) => {
-  const { name, email, password, role } = req.body;
+  const { name, username, email, password, role } = req.body;
   try {
-    if (!name || !email || !password) {
-      return res.status(400).json({ message: 'Todos los campos son obligatorios' });
+    if (!name || !password || (!username && !email)) {
+      return res.status(400).json({ message: 'Nombre, usuario/email y contraseña son obligatorios' });
     }
 
-    const cleanEmail = email.trim().toLowerCase();
-    const userExists = await User.findOne({ email: cleanEmail });
+    const cleanUsername = username ? username.trim().toLowerCase() : null;
+    const cleanEmail = email ? email.trim().toLowerCase() : `${cleanUsername}@panaderia.local`;
+
+    // Verificación de duplicados
+    const userExists = await User.findOne({
+      $or: [
+        { email: cleanEmail },
+        ...(cleanUsername ? [{ username: cleanUsername }] : [])
+      ]
+    });
 
     if (userExists) {
-      return res.status(400).json({ message: 'El usuario con ese correo electrónico ya existe' });
+      return res.status(400).json({ message: 'El nombre de usuario o correo ya se encuentra registrado' });
     }
 
     const user = await User.create({
       name: name.trim(),
+      username: cleanUsername,
       email: cleanEmail,
       password,
       role: role || 'cajero',
@@ -37,6 +46,7 @@ exports.createUser = async (req, res) => {
     res.status(201).json({
       _id: user._id,
       name: user.name,
+      username: user.username,
       email: user.email,
       role: user.role,
       isAdmin: user.isAdmin,
@@ -45,6 +55,31 @@ exports.createUser = async (req, res) => {
   } catch (error) {
     console.error('Error al crear usuario:', error);
     res.status(500).json({ message: 'Error al dar de alta el usuario', error: error.message });
+  }
+};
+
+// Cambiar / Resetear contraseña desde el panel de Admin
+exports.updateUserPassword = async (req, res) => {
+  const { id } = req.params;
+  const { password } = req.body;
+
+  try {
+    if (!password) {
+      return res.status(400).json({ message: 'La nueva contraseña es requerida' });
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+    }
+
+    user.password = password;
+    await user.save();
+
+    res.status(200).json({ message: 'Contraseña actualizada con éxito' });
+  } catch (error) {
+    console.error('Error al actualizar contraseña:', error);
+    res.status(500).json({ message: 'Error al actualizar la contraseña', error: error.message });
   }
 };
 
@@ -57,8 +92,7 @@ exports.deleteUser = async (req, res) => {
       return res.status(404).json({ message: 'Usuario no encontrado' });
     }
 
-    // Protección para evitar la eliminación del administrador principal
-    if (user.email === 'mgpanaderiayconfiteria@gmail.com') {
+    if (user.email === 'mgpanaderiayconfiteria@gmail.com' || user.username === 'admin') {
       return res.status(400).json({ message: 'No se puede eliminar la cuenta del administrador principal' });
     }
 
