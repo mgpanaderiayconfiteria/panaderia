@@ -2,13 +2,16 @@ import React, { createContext, useState, useEffect } from 'react';
 
 export const ProductContext = createContext();
 
+// Dirección absoluta del backend Express
+const API_URL = 'http://localhost:5000/api/products';
+
 export const ProductProvider = ({ children }) => {
   const [products, setProducts] = useState([]);
 
   // Cargar productos desde la base de datos
   const fetchProducts = async () => {
     try {
-      const response = await fetch('/api/products');
+      const response = await fetch(API_URL);
       if (!response.ok) throw new Error('Error al obtener los productos');
       const data = await response.json();
       setProducts(data);
@@ -24,7 +27,7 @@ export const ProductProvider = ({ children }) => {
   // Agregar nuevo producto (Alta en Backend)
   const addProduct = async (productData) => {
     try {
-      const response = await fetch('/api/products', {
+      const response = await fetch(API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -44,7 +47,7 @@ export const ProductProvider = ({ children }) => {
   // Actualizar producto (Modificación en Backend)
   const updateProduct = async (id, updatedData) => {
     try {
-      const response = await fetch(`/api/products/${id}`, {
+      const response = await fetch(`${API_URL}/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -66,7 +69,7 @@ export const ProductProvider = ({ children }) => {
   // Eliminar producto (Baja en Backend)
   const deleteProduct = async (id) => {
     try {
-      const response = await fetch(`/api/products/${id}`, {
+      const response = await fetch(`${API_URL}/${id}`, {
         method: 'DELETE'
       });
 
