@@ -41,7 +41,6 @@ const ProductsManager = () => {
   };
 
   const handleEdit = (product) => {
-    // MongoDB usa _id de forma nativa
     setEditingId(product._id || product.id);
     setFormData({
       name: product.name,
@@ -115,7 +114,7 @@ const ProductsManager = () => {
           </div>
 
           <div style={styles.inputGroup}>
-            <label style={styles.label}>Costo COGS ($)</label>
+            <label style={styles.label}>Precio Costo ($)</label>
             <input
               type="number"
               step="0.01"
@@ -164,7 +163,7 @@ const ProductsManager = () => {
                 <th style={styles.th}>Nombre</th>
                 <th style={styles.th}>Categoría</th>
                 <th style={styles.th}>Precio Venta</th>
-                <th style={styles.th}>Costo (COGS)</th>
+                <th style={styles.th}>Precio Costo</th>
                 <th style={styles.th}>Stock</th>
                 <th style={{ ...styles.th, textAlign: 'center' }}>Acciones</th>
               </tr>
