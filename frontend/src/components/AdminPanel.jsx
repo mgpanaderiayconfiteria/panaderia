@@ -1,37 +1,11 @@
 import React, { useState, useContext } from 'react';
 import { ProductContext } from '../context/ProductContext';
 import UsersManager from '../components/UsersManager';
+import ProductsManager from '../components/ProductsManager';
 
 const AdminPanel = () => {
-  const { products, addProduct } = useContext(ProductContext);
+  const { products } = useContext(ProductContext);
   const [activeTab, setActiveTab] = useState('dashboard');
-
-  const [formData, setFormData] = useState({
-    name: '',
-    category: 'Panadería',
-    price: '',
-    cogs: '',
-    stock: ''
-  });
-
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!formData.name || !formData.price) return;
-
-    addProduct({
-      name: formData.name,
-      category: formData.category,
-      price: parseFloat(formData.price),
-      cogs: parseFloat(formData.cogs || 0),
-      stock: parseInt(formData.stock || 0, 10)
-    });
-
-    setFormData({ name: '', category: 'Panadería', price: '', cogs: '', stock: '' });
-  };
 
   // Cálculos dinámicos limpios sobre datos reales
   const totalEarnings = products.reduce((acc, p) => acc + (p.price * (p.salesCount || 0)), 0);
@@ -49,6 +23,12 @@ const AdminPanel = () => {
             Panel de Control
           </span>
           <span 
+            style={{ ...styles.navLink, ...(activeTab === 'products' ? styles.navLinkActive : {}) }}
+            onClick={() => setActiveTab('products')}
+          >
+            Gestión de Productos
+          </span>
+          <span 
             style={{ ...styles.navLink, ...(activeTab === 'users' ? styles.navLinkActive : {}) }}
             onClick={() => setActiveTab('users')}
           >
@@ -62,6 +42,13 @@ const AdminPanel = () => {
           </div>
         </div>
       </nav>
+
+      {/* Vista de Gestión de Productos */}
+      {activeTab === 'products' && (
+        <main style={styles.mainContent}>
+          <ProductsManager />
+        </main>
+      )}
 
       {/* Vista de Gestión de Usuarios */}
       {activeTab === 'users' && (
@@ -135,47 +122,13 @@ const AdminPanel = () => {
                   <div style={styles.badgeGray}>Stock normal en todos los productos</div>
                 ) : (
                   products.filter(p => p.stock <= 5).map(p => (
-                    <div key={p.id} style={styles.badgeGray}>
+                    <div key={p.id || p._id} style={styles.badgeGray}>
                       {p.name}: <span style={{ color: '#dc2626' }}>STOCK BAJO ({p.stock})</span>
                     </div>
                   ))
                 )}
               </div>
             </div>
-          </div>
-
-          {/* Formulario de Alta de Producto */}
-          <div style={{ ...styles.card, marginBottom: '20px' }}>
-            <h2 style={styles.cardTitle}>ALTA DE NUEVO PRODUCTO</h2>
-            <form onSubmit={handleSubmit} style={styles.formRow}>
-              <div style={styles.inputGroup}>
-                <label style={styles.label}>Nombre Producto</label>
-                <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Ej. Medialuna" style={styles.input} required />
-              </div>
-              <div style={styles.inputGroup}>
-                <label style={styles.label}>Categoría</label>
-                <select name="category" value={formData.category} onChange={handleChange} style={styles.input}>
-                  <option value="Panadería">Panadería</option>
-                  <option value="Facturería">Facturería</option>
-                  <option value="Repostería">Repostería</option>
-                  <option value="Cafetería">Cafetería</option>
-                  <option value="Especialidades">Especialidades</option>
-                </select>
-              </div>
-              <div style={styles.inputGroup}>
-                <label style={styles.label}>Precio Venta ($)</label>
-                <input type="number" name="price" value={formData.price} onChange={handleChange} placeholder="0.00" style={styles.input} required />
-              </div>
-              <div style={styles.inputGroup}>
-                <label style={styles.label}>Costo COGS ($)</label>
-                <input type="number" name="cogs" value={formData.cogs} onChange={handleChange} placeholder="0.00" style={styles.input} />
-              </div>
-              <div style={styles.inputGroup}>
-                <label style={styles.label}>Stock Inicial</label>
-                <input type="number" name="stock" value={formData.stock} onChange={handleChange} placeholder="0" style={styles.input} />
-              </div>
-              <button type="submit" style={styles.btnSubmit}>Cargar Producto</button>
-            </form>
           </div>
 
           {/* Tabla de análisis de rentabilidad */}
@@ -420,42 +373,6 @@ const styles = {
     fontSize: '0.8rem',
     marginBottom: '6px',
     color: '#334155'
-  },
-  formRow: {
-    display: 'flex',
-    gap: '10px',
-    alignItems: 'flex-end',
-    flexWrap: 'wrap',
-    marginTop: '10px'
-  },
-  inputGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '4px',
-    flex: '1',
-    minWidth: '120px'
-  },
-  label: {
-    fontSize: '0.75rem',
-    fontWeight: '600',
-    color: '#475569'
-  },
-  input: {
-    padding: '6px 10px',
-    borderRadius: '4px',
-    border: '1px solid #cbd5e1',
-    fontSize: '0.8rem',
-    outline: 'none'
-  },
-  btnSubmit: {
-    backgroundColor: '#1b4332',
-    color: '#ffffff',
-    border: 'none',
-    padding: '8px 16px',
-    borderRadius: '4px',
-    fontWeight: 'bold',
-    fontSize: '0.8rem',
-    cursor: 'pointer'
   },
   table: {
     width: '100%',
