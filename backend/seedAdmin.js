@@ -1,41 +1,43 @@
-// backend/resetPassword.js
 const mongoose = require('mongoose');
-const path = require('path');
-const bcrypt = require('bcryptjs');
-require('dotenv').config();
+const dotenv = require('dotenv');
+const User = require('./models/User');
 
-const User = require(path.join(__dirname, 'models', 'User'));
+dotenv.config();
 
-const resetAdmin = async () => {
+const seedAdmin = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI);
-    
-    const email = 'luisinnapilcheria@gmail.com';
-    const newPassword = 'Luisinna123456';
-    
-    // Hash manual si tu modelo no tiene middleware pre('save')
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(newPassword, salt);
+    await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/panaderia');
+    console.log('Conectado a MongoDB para seed...');
 
-    const user = await User.findOneAndUpdate(
-      { email },
-      { 
-        password: hashedPassword,
+    const adminEmail = 'mgpanaderiayconfiteria@gmail.com';
+    const adminPassword = 'pana80y2';
+
+    let admin = await User.findOne({ email: adminEmail });
+
+    if (admin) {
+      admin.password = adminPassword;
+      admin.role = 'admin';
+      admin.isAdmin = true;
+      await admin.save();
+      console.log('Usuario administrador actualizado correctamente.');
+    } else {
+      admin = new User({
+        name: 'MG Administrador',
+        email: adminEmail,
+        password: adminPassword,
         role: 'admin',
-        name: 'Administradora Luisinna'
-      },
-      { upsert: true, new: true }
-    );
+        isAdmin: true
+      });
+      await admin.save();
+      console.log('Usuario administrador creado con éxito.');
+    }
 
-    console.log('✅ Contraseña restablecida con éxito para:', user.email);
-    console.log('🔑 Nueva contraseña:', newPassword);
-    
     await mongoose.connection.close();
     process.exit(0);
-  } catch (err) {
-    console.error('❌ Error:', err.message);
+  } catch (error) {
+    console.error('Error al sembrar el usuario administrador:', error);
     process.exit(1);
   }
 };
 
-resetAdmin();
+seedAdmin();
