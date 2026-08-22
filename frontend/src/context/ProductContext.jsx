@@ -2,8 +2,12 @@ import React, { createContext, useState, useEffect } from 'react';
 
 export const ProductContext = createContext();
 
-// Dirección absoluta del backend Express
-const API_URL = 'http://localhost:5000/api/products';
+// Si estás en producción usa la URL pública de Render, de lo contrario usa localhost:5000
+const BASE_URL = window.location.hostname === 'localhost' 
+  ? 'http://localhost:5000' 
+  : 'https://mgpanaderia.onrender.com';
+
+const API_URL = `${BASE_URL}/api/products`;
 
 export const ProductProvider = ({ children }) => {
   const [products, setProducts] = useState([]);
