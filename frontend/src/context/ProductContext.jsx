@@ -2,9 +2,12 @@ import React, { createContext, useState, useEffect } from 'react';
 
 export const ProductContext = createContext();
 
+// URL exacta del Web Service (Backend en Node.js)
+const BACKEND_URL = 'https://panaderia-2syo.onrender.com';
+
 const BASE_URL = window.location.hostname === 'localhost' 
   ? 'http://localhost:5000' 
-  : 'https://mgpanaderia.onrender.com';
+  : BACKEND_URL;
 
 const API_URL = `${BASE_URL}/api/products`;
 
