@@ -7,7 +7,7 @@ const User = require('./models/User');
 
 const app = express();
 
-// 1. Configuración de CORS con la URL de producción agregada
+// 1. Configuración de CORS
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
@@ -33,6 +33,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Rutas de la API
 app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/products', require('./routes/productRoutes'));
 app.use('/api/orders', require('./routes/orders'));
 
@@ -42,7 +43,6 @@ const initAdmin = async () => {
     const adminEmail = (process.env.ADMIN_EMAIL || 'mgpanaderiayconfiteria@gmail.com').trim().toLowerCase();
     const adminPassword = process.env.ADMIN_PASSWORD || 'pana80y2';
 
-    // Se solicita explícitamente el campo password para evitar fallos de Mongoose al guardar
     let existingAdmin = await User.findOne({ email: adminEmail }).select('+password');
 
     if (!existingAdmin) {
@@ -79,7 +79,7 @@ app.get('/', (req, res) => {
   res.send('API de Panadería funcionando 🚀');
 });
 
-// Manejador global de errores para prevenir caídas
+// Manejador global de errores
 app.use((err, req, res, next) => {
   console.error('🔥 Error en el servidor:', err.message);
   res.status(500).json({ message: 'Error interno en el servidor', error: err.message });
