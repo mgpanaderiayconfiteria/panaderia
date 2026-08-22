@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+/* Si quieres personalizar variables de tu tema (opcional): */
+@theme {
+  --color-primario: #3b82f6;
+  --font-principal: 'Inter', sans-serif;
+}
+
+/* Tus estilos CSS normales (opcional): */
+body {
+  background-color: #f8fafc;
+}

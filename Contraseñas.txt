@@ -1,0 +1,9 @@
+
+
+
+https://github.com/mgpanaderiayconfiteria/panaderia.git
+
+mgpanaderiayconfiteria_db_user
+N8eY6Ea2CGwnJ1np
+
+mongodb+srv://mgpanaderiayconfiteria_db_user:N8eY6Ea2CGwnJ1np@panaderia.sjimwn3.mongodb.net/?appName=Panaderia
