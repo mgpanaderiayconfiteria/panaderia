@@ -1,12 +1,20 @@
 @import "tailwindcss";
 
-/* Si quieres personalizar variables de tu tema (opcional): */
 @theme {
-  --color-primario: #3b82f6;
+  --color-primary: #1b4332;
+  --color-dark: #0f2337;
+  --font-serif: 'Cinzel', serif;
   --font-principal: 'Inter', sans-serif;
 }
 
-/* Tus estilos CSS normales (opcional): */
 body {
   background-color: #f8fafc;
+  font-family: 'Inter', sans-serif;
+  color: #1e293b;
+  margin: 0;
+  padding: 0;
+}
+
+h1, h2, h3, .brand-title {
+  font-family: 'Cinzel', serif;
 }
