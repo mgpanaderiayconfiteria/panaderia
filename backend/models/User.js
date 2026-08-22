@@ -4,12 +4,12 @@ const bcrypt = require('bcryptjs');
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-  password: { type: String, required: true },
+  password: { type: String, required: true, select: false },
   role: { type: String, enum: ['admin', 'cajero', 'empleado'], default: 'cajero' },
   isAdmin: { type: Boolean, default: false }
 }, { timestamps: true });
 
-// Middleware pre-save asíncrono (sin parametro next)
+// Middleware pre-save asíncrono
 userSchema.pre('save', async function () {
   if (!this.isModified('password')) return;
   const salt = await bcrypt.genSalt(10);
