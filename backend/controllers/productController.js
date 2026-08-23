@@ -15,16 +15,30 @@ exports.getProducts = async (req, res) => {
 
 // Crear un nuevo producto
 exports.createProduct = async (req, res) => {
-  console.log('📝 [PRODUCTOS] Intentando crear producto con datos:', JSON.stringify(req.body));
+  // Evitamos imprimir en consola la cadena completa Base64 para mantener limpios los logs
+  const logData = { ...req.body, image: req.body.image ? '[BASE64_IMAGE]' : '' };
+  console.log('📝 [PRODUCTOS] Intentando crear producto con datos:', JSON.stringify(logData));
+
   try {
-    const { name, category, price, cogs, stock } = req.body;
+    const { name, category, sellType, unit, price, cogs, stock, image } = req.body;
     
+    // Mapeo por defecto de unidades según el tipo de venta
+    let finalUnit = unit;
+    if (!finalUnit) {
+      if (sellType === 'peso') finalUnit = 'kg';
+      else if (sellType === 'porcion') finalUnit = 'porcion';
+      else finalUnit = 'un';
+    }
+
     const newProduct = new Product({
       name,
       category,
+      sellType: sellType || 'unidad',
+      unit: finalUnit,
       price,
       cogs,
-      stock
+      stock,
+      image: image || ''
     });
 
     const savedProduct = await newProduct.save();
@@ -36,7 +50,7 @@ exports.createProduct = async (req, res) => {
   }
 };
 
-// Actualizar un producto (precio, stock, categoría, etc.)
+// Actualizar un producto (precio, stock, modalidad de venta, imagen, etc.)
 exports.updateProduct = async (req, res) => {
   const { id } = req.params;
   console.log(`✏️ [PRODUCTOS] Intentando actualizar producto ID: ${id}`);

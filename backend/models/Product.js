@@ -12,6 +12,18 @@ const productSchema = new mongoose.Schema({
     enum: ['Panadería', 'Facturería', 'Repostería', 'Cafetería', 'Especialidades'],
     default: 'Panadería'
   },
+  sellType: {
+    type: String,
+    required: true,
+    enum: ['unidad', 'peso', 'porcion'],
+    default: 'unidad'
+  },
+  unit: {
+    type: String,
+    required: true,
+    enum: ['un', 'kg', 'gr', 'porcion'],
+    default: 'un'
+  },
   price: {
     type: Number,
     required: [true, 'El precio de venta es obligatorio'],
@@ -26,6 +38,10 @@ const productSchema = new mongoose.Schema({
     type: Number,
     default: 0,
     min: 0
+  },
+  image: {
+    type: String,
+    default: ''
   },
   salesCount: {
     type: Number,
