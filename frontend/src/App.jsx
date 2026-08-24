@@ -13,7 +13,8 @@ function ProtectedRoute({ children, roleRequired }) {
     return <Navigate to="/login" replace />;
   }
 
-  if (roleRequired === 'admin' && !isAdmin) {
+  // Si se requiere rol de admin y el usuario no lo es, se lo reorienta a la caja
+  if (roleRequired === 'admin' && !isAdmin && user?.role !== 'admin') {
     return <Navigate to="/caja" replace />;
   }
 
@@ -21,15 +22,21 @@ function ProtectedRoute({ children, roleRequired }) {
 }
 
 function App() {
-  const { user } = useContext(AuthContext);
+  const { user, isAdmin } = useContext(AuthContext);
+
+  // Determinar si el usuario posee privilegios administrativos
+  const userIsAdmin = isAdmin || user?.role === 'admin';
 
   return (
     <BrowserRouter>
       <Navbar />
       <Routes>
-        <Route path="/login" element={user ? <Navigate to={user.role === 'admin' || user.isAdmin ? "/admin" : "/caja"} replace /> : <Login />} />
+        <Route 
+          path="/login" 
+          element={user ? <Navigate to={userIsAdmin ? "/admin" : "/caja"} replace /> : <Login />} 
+        />
         
-        {/* Vista del cajero */}
+        {/* Vista exclusiva para Cajeros y personal operativo */}
         <Route 
           path="/caja" 
           element={
@@ -39,7 +46,7 @@ function App() {
           } 
         />
 
-        {/* Panel del Administrador */}
+        {/* Panel exclusivo para Administrador */}
         <Route 
           path="/admin" 
           element={
@@ -49,8 +56,11 @@ function App() {
           } 
         />
 
-        {/* Redirección por defecto */}
-        <Route path="*" element={<Navigate to={user ? "/caja" : "/login"} replace />} />
+        {/* Redirección por defecto según perfil */}
+        <Route 
+          path="*" 
+          element={<Navigate to={user ? (userIsAdmin ? "/admin" : "/caja") : "/login"} replace />} 
+        />
       </Routes>
     </BrowserRouter>
   );
