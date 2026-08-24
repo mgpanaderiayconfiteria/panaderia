@@ -9,21 +9,11 @@ const User = require('./models/User');
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const productRoutes = require('./routes/productRoutes');
-
-let orderRoutes;
-try {
-  orderRoutes = require('./routes/orderRoutes');
-} catch (e) {
-  try {
-    orderRoutes = require('./routes/orders');
-  } catch (err) {
-    console.warn('⚠️ No se encontró el archivo de rutas para órdenes (/routes/orderRoutes o /routes/orders)');
-  }
-}
+const orderRoutes = require('./routes/orderRoutes');
 
 const app = express();
 
-// 1. Configuración de CORS
+// Configuración de CORS
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
@@ -65,14 +55,18 @@ app.use((req, res, next) => {
   next();
 });
 
-// Rutas de la API seguras
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/products', productRoutes);
+// Vinculación segura de rutas
+if (typeof authRoutes === 'function') app.use('/api/auth', authRoutes);
+else console.warn('⚠️ authRoutes no exporta un router válido');
 
-if (orderRoutes) {
-  app.use('/api/orders', orderRoutes);
-}
+if (typeof userRoutes === 'function') app.use('/api/users', userRoutes);
+else console.warn('⚠️ userRoutes no exporta un router válido');
+
+if (typeof productRoutes === 'function') app.use('/api/products', productRoutes);
+else console.warn('⚠️ productRoutes no exporta un router válido');
+
+if (typeof orderRoutes === 'function') app.use('/api/orders', orderRoutes);
+else console.warn('⚠️ orderRoutes no exporta un router válido');
 
 // Función para inicializar la cuenta Admin
 const initAdmin = async () => {
