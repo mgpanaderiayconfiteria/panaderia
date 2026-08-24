@@ -3,25 +3,37 @@ import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 
 const Login = () => {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    
-    const result = await login(email, password);
-    if (result.success) {
-      if (result.user.role === 'admin' || result.user.isAdmin) {
-        navigate('/admin');
+    setLoading(true);
+
+    const cleanIdentifier = identifier.trim().toLowerCase();
+
+    try {
+      const result = await login(cleanIdentifier, password);
+
+      if (result && result.success) {
+        const loggedUser = result.user || {};
+        if (loggedUser.role === 'admin' || loggedUser.isAdmin) {
+          navigate('/admin');
+        } else {
+          navigate('/caja');
+        }
       } else {
-        navigate('/caja');
+        setError(result?.message || 'Credenciales incorrectas');
       }
-    } else {
-      setError(result.message || 'Credenciales incorrectas');
+    } catch (err) {
+      setError('Error al conectar con el servidor. Intente nuevamente.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -38,14 +50,15 @@ const Login = () => {
 
         <form onSubmit={handleSubmit} style={styles.form}>
           <div style={styles.inputGroup}>
-            <label style={styles.label}>Correo Electrónico</label>
+            <label style={styles.label}>Usuario o Correo Electrónico</label>
             <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="usuario@panaderia.com"
+              type="text"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              placeholder="ejemplo@panaderia.com o usuario"
               style={styles.input}
               required
+              disabled={loading}
             />
           </div>
 
@@ -58,11 +71,12 @@ const Login = () => {
               placeholder="••••••••"
               style={styles.input}
               required
+              disabled={loading}
             />
           </div>
 
-          <button type="submit" style={styles.btnSubmit}>
-            Ingresar al Sistema
+          <button type="submit" style={styles.btnSubmit} disabled={loading}>
+            {loading ? 'Ingresando...' : 'Ingresar al Sistema'}
           </button>
         </form>
       </div>
