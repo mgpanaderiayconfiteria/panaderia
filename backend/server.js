@@ -54,14 +54,14 @@ app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/products', require('./routes/productRoutes'));
 
-// Manejo seguro de la ruta de órdenes según el nombre de tu archivo
+// Carga e interconexión dinámica de las rutas de ventas/órdenes
 try {
-  app.use('/api/orders', require('./routes/orders'));
+  app.use('/api/orders', require('./routes/orderRoutes'));
 } catch (e) {
   try {
-    app.use('/api/orders', require('./routes/orderRoutes'));
+    app.use('/api/orders', require('./routes/orders'));
   } catch (err) {
-    console.warn('⚠️ No se encontró la ruta de órdenes (orders/orderRoutes)');
+    console.warn('⚠️ No se encontró el archivo de rutas para órdenes (/routes/orderRoutes o /routes/orders)');
   }
 }
 

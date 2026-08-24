@@ -1,21 +1,35 @@
 const Order = require('../models/Order');
 
-exports.addOrderItems = async (req, res) => {
-  const { orderItems, shippingAddress, totalAmount } = req.body;
-  if (orderItems && orderItems.length === 0) {
-    return res.status(400).json({ message: 'No hay productos en el pedido' });
-  } else {
-    try {
-      const order = new Order({
-        user: req.user._id,
-        products: orderItems.map(x => ({ product: x._id, quantity: x.qty })),
-        shippingAddress,
-        totalAmount
-      });
-      const createdOrder = await order.save();
-      res.status(201).json(createdOrder);
-    } catch (error) {
-      res.status(500).json({ message: 'Error al procesar el pedido' });
-    }
+// Crear nueva venta desde el POS
+exports.createOrder = async (req, res) => {
+  try {
+    const { items, subtotal, discount, total, paidAmount, changeAmount, paymentMethod } = req.body;
+
+    const newOrder = new Order({
+      items,
+      subtotal,
+      discount: discount || 0,
+      total,
+      paidAmount,
+      changeAmount,
+      paymentMethod,
+      seller: req.user?._id, // Viene del middleware de autenticación (JWT)
+      employee: req.user?.name || 'Empleado Caja'
+    });
+
+    const savedOrder = await newOrder.save();
+    res.status(201).json(savedOrder);
+  } catch (error) {
+    res.status(500).json({ message: 'Error al registrar la venta', error: error.message });
+  }
+};
+
+// Obtener todas las ventas (Para Panel Admin)
+exports.getOrders = async (req, res) => {
+  try {
+    const orders = await Order.find().populate('seller', 'name email role').sort({ createdAt: -1 });
+    res.status(200).json(orders);
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener las ventas', error: error.message });
   }
 };
