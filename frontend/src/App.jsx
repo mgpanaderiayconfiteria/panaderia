@@ -8,6 +8,7 @@ import Navbar from './components/Navbar';
 import Login from './pages/Login';
 import CajaHome from './pages/CajaHome';
 import NuevoCliente from './pages/NuevoCliente';
+import UltimosMovimientos from './pages/UltimosMovimientos';
 import AdminPanel from './components/AdminPanel';
 
 function ProtectedRoute({ children, roleRequired }) {
@@ -37,7 +38,6 @@ function AppContent() {
           element={user ? <Navigate to={userIsAdmin ? "/admin" : "/caja"} replace /> : <Login />} 
         />
         
-        {/* Vista principal de Caja */}
         <Route 
           path="/caja" 
           element={
@@ -47,7 +47,6 @@ function AppContent() {
           } 
         />
 
-        {/* Módulo Punto de Venta / Nuevo Cliente */}
         <Route 
           path="/nuevo-cliente" 
           element={
@@ -57,7 +56,15 @@ function AppContent() {
           } 
         />
 
-        {/* Panel de Administrador */}
+        <Route 
+          path="/ultimos-movimientos" 
+          element={
+            <ProtectedRoute>
+              <UltimosMovimientos />
+            </ProtectedRoute>
+          } 
+        />
+
         <Route 
           path="/admin" 
           element={
@@ -67,7 +74,6 @@ function AppContent() {
           } 
         />
 
-        {/* Redirección por defecto */}
         <Route 
           path="*" 
           element={<Navigate to={user ? (userIsAdmin ? "/admin" : "/caja") : "/login"} replace />} 
