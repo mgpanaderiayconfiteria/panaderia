@@ -1,37 +1,66 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useMemo } from 'react';
 import { ProductContext } from '../context/ProductContext';
+import { SaleContext } from '../context/SaleContext';
 import UsersManager from '../components/UsersManager';
 import ProductsManager from '../components/ProductsManager';
 
 const AdminPanel = () => {
   const { products } = useContext(ProductContext);
+  const { sales } = useContext(SaleContext);
   const [activeTab, setActiveTab] = useState('dashboard');
 
-  // Cálculos dinámicos limpios sobre datos reales
-  const totalEarnings = products.reduce((acc, p) => acc + (p.price * (p.salesCount || 0)), 0);
+  const totalEarnings = useMemo(() => {
+    return sales.reduce((acc, sale) => acc + (parseFloat(sale.total) || 0), 0);
+  }, [sales]);
+
+  const shiftTotals = useMemo(() => {
+    let morning = 0;
+    let afternoon = 0;
+    sales.forEach((sale) => {
+      const saleDate = new Date(sale.createdAt || sale.timestamp || Date.now());
+      const hour = saleDate.getHours();
+      const amount = parseFloat(sale.total) || 0;
+      if (hour >= 6 && hour < 14) morning += amount;
+      else afternoon += amount;
+    });
+    return { morning, afternoon };
+  }, [sales]);
+
+  const productSalesMap = useMemo(() => {
+    const map = {};
+    sales.forEach((sale) => {
+      if (Array.isArray(sale.items)) {
+        sale.items.forEach((item) => {
+          const prodId = item.productId || item.product || item.id;
+          const qty = parseFloat(item.quantityVal || item.quantity) || 0;
+          const subtotal = parseFloat(item.subtotal || (item.price * qty)) || 0;
+          if (!map[prodId]) map[prodId] = { qty: 0, revenue: 0, name: item.name };
+          map[prodId].qty += qty;
+          map[prodId].revenue += subtotal;
+        });
+      }
+    });
+    return map;
+  }, [sales]);
+
+  const topProductsList = useMemo(() => {
+    return Object.values(productSalesMap)
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 5);
+  }, [productSalesMap]);
 
   return (
     <div style={styles.dashboardContainer}>
-      {/* Barra de navegación superior */}
       <nav style={styles.topNav}>
         <div style={styles.navLeft}>
           <div style={styles.logoBadge}>MG</div>
-          <span 
-            style={{ ...styles.navLink, ...(activeTab === 'dashboard' ? styles.navLinkActive : {}) }}
-            onClick={() => setActiveTab('dashboard')}
-          >
+          <span style={{ ...styles.navLink, ...(activeTab === 'dashboard' ? styles.navLinkActive : {}) }} onClick={() => setActiveTab('dashboard')}>
             Panel de Control
           </span>
-          <span 
-            style={{ ...styles.navLink, ...(activeTab === 'products' ? styles.navLinkActive : {}) }}
-            onClick={() => setActiveTab('products')}
-          >
+          <span style={{ ...styles.navLink, ...(activeTab === 'products' ? styles.navLinkActive : {}) }} onClick={() => setActiveTab('products')}>
             Gestión de Productos
           </span>
-          <span 
-            style={{ ...styles.navLink, ...(activeTab === 'users' ? styles.navLinkActive : {}) }}
-            onClick={() => setActiveTab('users')}
-          >
+          <span style={{ ...styles.navLink, ...(activeTab === 'users' ? styles.navLinkActive : {}) }} onClick={() => setActiveTab('users')}>
             Gestión de Usuarios
           </span>
         </div>
@@ -43,21 +72,18 @@ const AdminPanel = () => {
         </div>
       </nav>
 
-      {/* Vista de Gestión de Productos */}
       {activeTab === 'products' && (
         <main style={styles.mainContent}>
           <ProductsManager />
         </main>
       )}
 
-      {/* Vista de Gestión de Usuarios */}
       {activeTab === 'users' && (
         <main style={styles.mainContent}>
           <UsersManager />
         </main>
       )}
 
-      {/* Vista principal del Panel de Control */}
       {activeTab === 'dashboard' && (
         <main style={styles.mainContent}>
           <div style={styles.headerRow}>
@@ -69,44 +95,42 @@ const AdminPanel = () => {
           </div>
 
           <div style={styles.topGrid}>
-            {/* Resumen de Ventas Diarias */}
             <div style={styles.card}>
               <div style={styles.cardHeader}>
                 <h2 style={styles.cardTitle}>RESUMEN DE VENTAS DIARIAS</h2>
               </div>
               <div style={styles.chartWrapper}>
                 <div style={styles.tooltipBox}>
-                  Total de Hoy: <strong>${totalEarnings.toFixed(2)}</strong>
+                  Total Registrado: <strong>${totalEarnings.toFixed(2)}</strong>
                 </div>
               </div>
               <div style={styles.subChartSection}>
                 <div style={styles.subChartTitle}>Ventas por Turno</div>
                 <div style={styles.subChartRow}>
                   <div>
-                    <div style={styles.shiftValue}>$0.00</div>
+                    <div style={styles.shiftValue}>${shiftTotals.morning.toFixed(2)}</div>
                     <div style={styles.shiftLabel}>Turno Mañana</div>
                   </div>
                   <div>
-                    <div style={styles.shiftValue}>$0.00</div>
+                    <div style={styles.shiftValue}>${shiftTotals.afternoon.toFixed(2)}</div>
                     <div style={styles.shiftLabel}>Turno Tarde</div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Ventas por Categoría / Productos Destacados */}
             <div style={styles.card}>
               <h2 style={styles.cardTitle}>PRODUCTOS MÁS VENDIDOS</h2>
               <div style={styles.donutGrid}>
                 <div style={styles.topProductsTable}>
                   <div style={styles.topProdHeader}><span>Producto</span><span>Vendidos</span></div>
-                  {products.length === 0 ? (
+                  {topProductsList.length === 0 ? (
                     <div style={styles.emptyRow}>Sin ventas registradas</div>
                   ) : (
-                    products.slice(0, 5).map((p, idx) => (
-                      <div key={p.id || idx} style={styles.topProdRow}>
+                    topProductsList.map((p, idx) => (
+                      <div key={idx} style={styles.topProdRow}>
                         <span>{idx + 1}. {p.name}</span>
-                        <strong>{p.salesCount || 0}</strong>
+                        <strong>{p.qty.toFixed(1)}</strong>
                       </div>
                     ))
                   )}
@@ -114,7 +138,6 @@ const AdminPanel = () => {
               </div>
             </div>
 
-            {/* Tendencias y Alertas */}
             <div style={styles.card}>
               <h2 style={styles.cardTitle}>ALERTAS DE STOCK</h2>
               <div style={styles.sidebarSection}>
@@ -131,7 +154,6 @@ const AdminPanel = () => {
             </div>
           </div>
 
-          {/* Tabla de análisis de rentabilidad */}
           <div style={styles.card}>
             <h2 style={styles.cardTitle}>ANÁLISIS DE RENTABILIDAD DE PRODUCTOS</h2>
             {products.length === 0 ? (
@@ -141,8 +163,8 @@ const AdminPanel = () => {
                 <thead>
                   <tr style={styles.trHead}>
                     <th style={styles.th}>Producto</th>
-                    <th style={styles.th}>Unidades Vendidas</th>
-                    <th style={styles.th}>Ingresos</th>
+                    <th style={styles.th}>Unidades / Cant. Vendida</th>
+                    <th style={styles.th}>Ingresos Reales</th>
                     <th style={styles.th}>Costo (COGS)</th>
                     <th style={styles.th}>Margen (%)</th>
                     <th style={styles.th}>Ganancia Total</th>
@@ -150,16 +172,19 @@ const AdminPanel = () => {
                 </thead>
                 <tbody>
                   {products.map((p) => {
-                    const unitsSold = p.salesCount || 0;
-                    const revenue = p.price * unitsSold;
+                    const prodId = p._id || p.id;
+                    const realSales = productSalesMap[prodId] || { qty: 0, revenue: 0 };
+                    const unitsSold = realSales.qty;
+                    const revenue = realSales.revenue;
                     const totalCogs = (p.cogs || 0) * unitsSold;
                     const totalProfit = revenue - totalCogs;
-                    const margin = p.price > 0 ? (((p.price - (p.cogs || 0)) / p.price) * 100).toFixed(1) : 0;
+                    const priceUnit = p.priceUnit || p.price || p.priceKg || 0;
+                    const margin = priceUnit > 0 ? (((priceUnit - (p.cogs || 0)) / priceUnit) * 100).toFixed(1) : 0;
 
                     return (
-                      <tr key={p.id || p._id} style={styles.trBody}>
+                      <tr key={prodId} style={styles.trBody}>
                         <td style={styles.td}><strong>{p.name}</strong></td>
-                        <td style={styles.td}>{unitsSold}</td>
+                        <td style={styles.td}>{unitsSold.toFixed(2)}</td>
                         <td style={styles.td}>${revenue.toFixed(2)}</td>
                         <td style={styles.td}>${totalCogs.toFixed(2)}</td>
                         <td style={styles.td}>{margin}%</td>
@@ -178,230 +203,45 @@ const AdminPanel = () => {
 };
 
 const styles = {
-  dashboardContainer: {
-    backgroundColor: '#eef2f5',
-    minHeight: '100vh',
-    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-    color: '#1e293b'
-  },
-  topNav: {
-    backgroundColor: '#0f2337',
-    height: '50px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '0 20px',
-    color: '#ffffff'
-  },
-  navLeft: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '20px'
-  },
-  logoBadge: {
-    backgroundColor: '#1b4332',
-    width: '28px',
-    height: '28px',
-    borderRadius: '4px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontWeight: 'bold',
-    fontSize: '0.8rem'
-  },
-  navLink: {
-    fontSize: '0.85rem',
-    color: '#94a3b8',
-    cursor: 'pointer'
-  },
-  navLinkActive: {
-    color: '#ffffff',
-    backgroundColor: '#1e3a5f',
-    padding: '6px 12px',
-    borderRadius: '4px'
-  },
-  navRight: {
-    display: 'flex',
-    alignItems: 'center'
-  },
-  userProfile: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    fontSize: '0.85rem'
-  },
-  avatar: {
-    width: '28px',
-    height: '28px',
-    borderRadius: '50%',
-    backgroundColor: '#cbd5e1',
-    color: '#0f2337',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '0.75rem',
-    fontWeight: 'bold'
-  },
-  mainContent: {
-    padding: '20px'
-  },
-  headerRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '20px'
-  },
-  pageTitle: {
-    fontSize: '1.25rem',
-    fontWeight: 'bold',
-    margin: 0,
-    letterSpacing: '0.5px'
-  },
-  dateSelector: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    backgroundColor: '#ffffff',
-    padding: '4px 10px',
-    borderRadius: '6px',
-    border: '1px solid #cbd5e1',
-    fontSize: '0.85rem'
-  },
-  dateButton: {
-    fontWeight: '600',
-    color: '#334155'
-  },
-  dateText: {
-    color: '#64748b'
-  },
-  topGrid: {
-    display: 'grid',
-    gridTemplateColumns: '1.2fr 1.1fr 0.7fr',
-    gap: '15px',
-    marginBottom: '20px'
-  },
-  card: {
-    backgroundColor: '#ffffff',
-    borderRadius: '8px',
-    padding: '16px',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-    border: '1px solid #e2e8f0'
-  },
-  cardHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '10px'
-  },
-  cardTitle: {
-    fontSize: '0.85rem',
-    fontWeight: 'bold',
-    margin: 0,
-    color: '#0f172a',
-    letterSpacing: '0.5px'
-  },
-  chartWrapper: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: '60px',
-    marginBottom: '10px'
-  },
-  tooltipBox: {
-    backgroundColor: '#0f2337',
-    color: '#ffffff',
-    padding: '8px 14px',
-    borderRadius: '6px',
-    fontSize: '0.85rem',
-    textAlign: 'center'
-  },
-  subChartSection: {
-    borderTop: '1px solid #f1f5f9',
-    paddingTop: '10px'
-  },
-  subChartTitle: {
-    fontSize: '0.75rem',
-    fontWeight: 'bold',
-    color: '#475569',
-    marginBottom: '6px'
-  },
-  subChartRow: {
-    display: 'flex',
-    justifyContent: 'space-around'
-  },
-  shiftValue: {
-    fontSize: '0.85rem',
-    fontWeight: 'bold'
-  },
-  shiftLabel: {
-    fontSize: '0.7rem',
-    color: '#64748b'
-  },
-  donutGrid: {
-    marginTop: '10px'
-  },
-  topProductsTable: {
-    fontSize: '0.75rem'
-  },
-  topProdHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    backgroundColor: '#f1f5f9',
-    padding: '6px 8px',
-    fontWeight: 'bold',
-    borderRadius: '4px'
-  },
-  topProdRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    padding: '6px 8px',
-    borderBottom: '1px solid #f8fafc'
-  },
-  emptyRow: {
-    padding: '12px 8px',
-    color: '#94a3b8',
-    fontSize: '0.8rem',
-    textAlign: 'center'
-  },
-  sidebarSection: {
-    marginTop: '10px'
-  },
-  badgeGray: {
-    backgroundColor: '#f1f5f9',
-    padding: '8px 12px',
-    borderRadius: '6px',
-    fontSize: '0.8rem',
-    marginBottom: '6px',
-    color: '#334155'
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-    marginTop: '10px',
-    fontSize: '0.8rem'
-  },
-  trHead: {
-    backgroundColor: '#f8fafc',
-    borderBottom: '1px solid #e2e8f0'
-  },
-  th: {
-    padding: '8px',
-    textAlign: 'left',
-    color: '#475569',
-    fontWeight: '600'
-  },
-  trBody: {
-    borderBottom: '1px solid #f1f5f9'
-  },
-  td: {
-    padding: '8px',
-    color: '#334155'
-  },
-  emptyText: {
-    color: '#94a3b8',
-    fontSize: '0.85rem',
-    marginTop: '10px'
-  }
+  dashboardContainer: { backgroundColor: '#eef2f5', minHeight: '100vh', fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', color: '#1e293b' },
+  topNav: { backgroundColor: '#0f2337', height: '50px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', color: '#ffffff' },
+  navLeft: { display: 'flex', alignItems: 'center', gap: '20px' },
+  logoBadge: { backgroundColor: '#1b4332', width: '28px', height: '28px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '0.8rem' },
+  navLink: { fontSize: '0.85rem', color: '#94a3b8', cursor: 'pointer' },
+  navLinkActive: { color: '#ffffff', backgroundColor: '#1e3a5f', padding: '6px 12px', borderRadius: '4px' },
+  navRight: { display: 'flex', alignItems: 'center' },
+  userProfile: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' },
+  avatar: { width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#cbd5e1', color: '#0f2337', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 'bold' },
+  mainContent: { padding: '20px' },
+  headerRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
+  pageTitle: { fontSize: '1.25rem', fontWeight: 'bold', margin: 0, letterSpacing: '0.5px' },
+  dateSelector: { display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: '#ffffff', padding: '4px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem' },
+  dateButton: { fontWeight: '600', color: '#334155' },
+  dateText: { color: '#64748b' },
+  topGrid: { display: 'grid', gridTemplateColumns: '1.2fr 1.1fr 0.7fr', gap: '15px', marginBottom: '20px' },
+  card: { backgroundColor: '#ffffff', borderRadius: '8px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' },
+  cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' },
+  cardTitle: { fontSize: '0.85rem', fontWeight: 'bold', margin: 0, color: '#0f172a', letterSpacing: '0.5px' },
+  chartWrapper: { display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60px', marginBottom: '10px' },
+  tooltipBox: { backgroundColor: '#0f2337', color: '#ffffff', padding: '8px 14px', borderRadius: '6px', fontSize: '0.85rem', textAlign: 'center' },
+  subChartSection: { borderTop: '1px solid #f1f5f9', paddingTop: '10px' },
+  subChartTitle: { fontSize: '0.75rem', fontWeight: 'bold', color: '#475569', marginBottom: '6px' },
+  subChartRow: { display: 'flex', justifyContent: 'space-around' },
+  shiftValue: { fontSize: '0.85rem', fontWeight: 'bold' },
+  shiftLabel: { fontSize: '0.7rem', color: '#64748b' },
+  donutGrid: { marginTop: '10px' },
+  topProductsTable: { fontSize: '0.75rem' },
+  topProdHeader: { display: 'flex', justifyContent: 'space-between', backgroundColor: '#f1f5f9', padding: '6px 8px', fontWeight: 'bold', borderRadius: '4px' },
+  topProdRow: { display: 'flex', justifyContent: 'space-between', padding: '6px 8px', borderBottom: '1px solid #f8fafc' },
+  emptyRow: { padding: '12px 8px', color: '#94a3b8', fontSize: '0.8rem', textAlign: 'center' },
+  sidebarSection: { marginTop: '10px' },
+  badgeGray: { backgroundColor: '#f1f5f9', padding: '8px 12px', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '6px', color: '#334155' },
+  table: { width: '100%', borderCollapse: 'collapse', marginTop: '10px', fontSize: '0.8rem' },
+  trHead: { backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' },
+  th: { padding: '8px', textAlign: 'left', color: '#475569', fontWeight: '600' },
+  trBody: { borderBottom: '1px solid #f1f5f9' },
+  td: { padding: '8px', color: '#334155' },
+  emptyText: { color: '#94a3b8', fontSize: '0.85rem', marginTop: '10px' }
 };
 
 export default AdminPanel;
