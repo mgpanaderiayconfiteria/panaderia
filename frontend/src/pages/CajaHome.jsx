@@ -23,29 +23,20 @@ const CajaHome = () => {
   // Estados de Gestión de Caja, Arqueo y Mermas
   const [initialCash, setInitialCash] = useState(localStorage.getItem('mg_initial_cash') || '0');
   const [tempCashInput, setTempCashInput] = useState('');
-  const [actualCashInput, setActualCashInput] = useState(''); // Efectivo real contado al cerrar
+  const [actualCashInput, setActualCashInput] = useState('');
   const [selectedWasteProd, setSelectedWasteProd] = useState('');
   const [wasteQty, setWasteQty] = useState('');
   
-  // Estado para el alta exprés del producto con soporte para tipos de venta
   const [newProd, setNewProd] = useState({ 
-    name: '', 
-    price: '', 
-    cost: '', 
-    stock: '', 
-    category: 'Panadería',
-    sellType: 'unidad' 
+    name: '', price: '', cost: '', stock: '', category: 'Panadería', sellType: 'unidad' 
   });
 
-  // Verificar si hay fondo de caja guardado al iniciar
   useEffect(() => {
     const savedCash = localStorage.getItem('mg_initial_cash');
-    if (!savedCash) {
-      setShowAperturaModal(true);
-    }
+    if (!savedCash) setShowAperturaModal(true);
   }, []);
 
-  // Cálculos de Arqueo para el Cierre de Turno
+  // Cálculos de Arqueo
   const totalEfectivoVentas = sales
     ? sales.filter(s => (s.paymentMethod || 'efectivo') === 'efectivo').reduce((acc, s) => acc + (parseFloat(s.total) || 0), 0)
     : 0;
@@ -57,12 +48,9 @@ const CajaHome = () => {
   const fondoInicialNum = parseFloat(initialCash) || 0;
   const efectivoEsperadoEnCaja = fondoInicialNum + totalEfectivoVentas;
   const recaudacionTotalProcesada = totalEfectivoVentas + totalDigital;
-
-  // Cálculo de descuadre en tiempo real
   const efectivoRealNum = parseFloat(actualCashInput) || 0;
   const diferenciaCaja = actualCashInput !== '' ? efectivoRealNum - efectivoEsperadoEnCaja : 0;
 
-  // Confirmar Apertura de Caja
   const handleConfirmApertura = () => {
     const cashVal = parseFloat(tempCashInput) || 0;
     setInitialCash(cashVal.toString());
@@ -70,7 +58,6 @@ const CajaHome = () => {
     setShowAperturaModal(false);
   };
 
-  // Confirmar Desperdicio / Sobrante
   const handleRegisterWaste = async () => {
     if (!selectedWasteProd || !wasteQty) {
       alert('Por favor seleccione un producto y especifique la cantidad.');
@@ -105,7 +92,6 @@ const CajaHome = () => {
     }
   };
 
-  // Confirmar Alta Exprés de Producto (Proveedor)
   const handleQuickAddProduct = async () => {
     if (!newProd.name || !newProd.price) {
       alert('Nombre y precio de venta son obligatorios.');
@@ -142,7 +128,6 @@ const CajaHome = () => {
     }
   };
 
-  // Finalizar Turno con Arqueo Completo
   const handleFinalizarTurno = async () => {
     if (actualCashInput === '') {
       alert('Por favor ingrese el monto de efectivo real contado en la caja.');
@@ -167,7 +152,7 @@ const CajaHome = () => {
         body: JSON.stringify(closurePayload)
       });
     } catch (e) {
-      console.warn('Servidor no disponible para guardar el reporte físico del turno, cerrando sesión local.');
+      console.warn('Servidor no disponible para guardar el reporte físico del turno.');
     }
 
     alert(`Turno cerrado exitosamente.\n\nEfectivo Esperado: $${efectivoEsperadoEnCaja.toFixed(2)}\nEfectivo Real: $${efectivoRealNum.toFixed(2)}\nDiferencia: $${diferenciaCaja.toFixed(2)}`);
@@ -177,37 +162,155 @@ const CajaHome = () => {
   };
 
   return (
-    <div style={styles.container}>
+    <div className="caja-container">
+      {/* Reglas CSS Responsivas */}
+      <style>{`
+        .caja-container {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: flex-start;
+          min-height: 100vh;
+          padding: 15px;
+          box-sizing: border-box;
+          background-color: #f8fafc;
+        }
+
+        .top-info-bar {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10px 20px;
+          align-items: center;
+          justify-content: center;
+          background-color: #ffffff;
+          padding: 10px 18px;
+          border-radius: 30px;
+          border: 1px solid #cbd5e1;
+          font-size: 0.9rem;
+          color: #334155;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+          margin-bottom: 20px;
+          width: 100%;
+          max-width: 800px;
+        }
+
+        /* GRID RESPONSIVA DE BOTONES */
+        .buttons-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 16px;
+          width: 100%;
+          max-width: 800px;
+          justify-items: center;
+          align-items: center;
+        }
+
+        /* iPad Vertical / Móvil Horizontal */
+        @media (min-width: 600px) {
+          .buttons-grid {
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+          }
+        }
+
+        /* iPad Horizontal / Pantallas Grandes */
+        @media (min-width: 900px) {
+          .buttons-grid {
+            grid-template-columns: repeat(3, 1fr);
+            gap: 25px;
+          }
+        }
+
+        /* ESTILO CIRCULAR Y RESPONSIVO PARA BOTONES */
+        .btn-circle {
+          width: 100%;
+          max-width: 140px;
+          aspect-ratio: 1 / 1;
+          border-radius: 50%;
+          border: none;
+          color: #ffffff;
+          font-weight: bold;
+          font-size: clamp(0.85rem, 2.5vw, 1.05rem);
+          cursor: pointer;
+          box-shadow: 0px 6px 14px rgba(0,0,0,0.12);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          padding: 12px;
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
+          user-select: none;
+        }
+
+        .btn-circle:active {
+          transform: scale(0.95);
+        }
+
+        .btn-green { background-color: #2e7d32; }
+        .btn-blue { background-color: #0284c7; }
+        .btn-orange { background-color: #ea580c; }
+        .btn-sky { background-color: #0369a1; }
+        .btn-yellow { background-color: #d97706; }
+        .btn-red { background-color: #c62828; }
+
+        /* ESTILOS DE MODALES ADAPTABLES */
+        .modal-card {
+          background-color: #ffffff;
+          width: 92%;
+          max-width: 440px;
+          max-height: 90vh;
+          overflow-y: auto;
+          border-radius: 16px;
+          padding: 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          box-shadow: 0 20px 25px -5px rgba(0,0,0,0.25);
+        }
+
+        .modal-content-large {
+          background-color: #f8fafc;
+          width: 95%;
+          max-width: 1100px;
+          height: 90vh;
+          border-radius: 16px;
+          display: flex;
+          flex-direction: column;
+          box-shadow: 0 20px 25px -5px rgba(0,0,0,0.25);
+          overflow: hidden;
+        }
+      `}</style>
+
       {/* BARRA SUPERIOR DE CONTEXTO DE CAJA */}
-      <div style={styles.topInfoBar}>
+      <div className="top-info-bar">
         <span>👤 Cajera: <strong>{user?.name || user?.username || 'Caja Activa'}</strong></span>
         <span>💵 Fondo Inicial: <strong>${fondoInicialNum.toFixed(2)}</strong></span>
         <button onClick={() => setShowAperturaModal(true)} style={styles.btnLinkEdit}>Ajustar Fondo</button>
       </div>
 
-      {/* BOTONES PRINCIPALES EN MODO MÓVIL/CIRCULAR */}
-      <div style={styles.buttonsGrid}>
-        <button style={{ ...styles.btnCircle, ...styles.btnGreen }} onClick={() => navigate('/nuevo-cliente')}>
+      {/* BOTONES PRINCIPALES EN MODO CIRCULAR Y RESPONSIVO */}
+      <div className="buttons-grid">
+        <button className="btn-circle btn-green" onClick={() => navigate('/nuevo-cliente')}>
           + Nuevo cliente
         </button>
 
-        <button style={{ ...styles.btnCircle, ...styles.btnBlue }} onClick={() => setShowCatalog(true)}>
+        <button className="btn-circle btn-blue" onClick={() => setShowCatalog(true)}>
           📦 Ver Stock / Precios
         </button>
 
-        <button style={{ ...styles.btnCircle, ...styles.btnOrange }} onClick={() => setShowWasteModal(true)}>
+        <button className="btn-circle btn-orange" onClick={() => setShowWasteModal(true)}>
           🗑️ Registrar Sobrante
         </button>
 
-        <button style={{ ...styles.btnCircle, ...styles.btnSky }} onClick={() => setShowQuickProdModal(true)}>
+        <button className="btn-circle btn-sky" onClick={() => setShowQuickProdModal(true)}>
           📥 Alta Proveedor
         </button>
 
-        <button style={{ ...styles.btnCircle, ...styles.btnYellow }} onClick={() => navigate('/ultimos-movimientos')}>
+        <button className="btn-circle btn-yellow" onClick={() => navigate('/ultimos-movimientos')}>
           Últimos movimientos
         </button>
 
-        <button style={{ ...styles.btnCircle, ...styles.btnRed }} onClick={() => setShowCierreModal(true)}>
+        <button className="btn-circle btn-red" onClick={() => setShowCierreModal(true)}>
           Cerrar turno
         </button>
       </div>
@@ -215,7 +318,7 @@ const CajaHome = () => {
       {/* MODAL APERTURA DE CAJA / FONDO INICIAL */}
       {showAperturaModal && (
         <div style={styles.modalOverlay}>
-          <div style={styles.modalCard}>
+          <div className="modal-card">
             <div style={styles.modalHeader}>
               <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#0f172a' }}>💵 APERTURA DE CAJA</h3>
             </div>
@@ -240,7 +343,7 @@ const CajaHome = () => {
       {/* MODAL CATALOGO */}
       {showCatalog && (
         <div style={styles.modalOverlay}>
-          <div style={styles.modalContent}>
+          <div className="modal-content-large">
             <div style={styles.modalHeader}>
               <h2 style={{ margin: 0, fontSize: '1.2rem', color: '#0f172a' }}>CONSULTA DE STOCK Y PRECIOS</h2>
               <button onClick={() => setShowCatalog(false)} style={styles.btnCloseModal}>✕ Cerrar</button>
@@ -253,7 +356,7 @@ const CajaHome = () => {
       {/* MODAL REGISTRAR DESPERDICIO / SOBRANTE */}
       {showWasteModal && (
         <div style={styles.modalOverlay}>
-          <div style={styles.modalCard}>
+          <div className="modal-card">
             <div style={styles.modalHeader}>
               <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>🗑️ REGISTRAR SOBRANTE / MERMA</h3>
               <button onClick={() => setShowWasteModal(false)} style={styles.btnCloseModal}>✕</button>
@@ -290,7 +393,7 @@ const CajaHome = () => {
       {/* MODAL ALTA EXPRÉS PROVEEDORES */}
       {showQuickProdModal && (
         <div style={styles.modalOverlay}>
-          <div style={styles.modalCard}>
+          <div className="modal-card">
             <div style={styles.modalHeader}>
               <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>📦 RECEPCIÓN EXPRÉS PROVEEDOR</h3>
               <button onClick={() => setShowQuickProdModal(false)} style={styles.btnCloseModal}>✕</button>
@@ -365,7 +468,7 @@ const CajaHome = () => {
       {/* MODAL CIERRE DE TURNO Y ARQUEO COMPLETO */}
       {showCierreModal && (
         <div style={styles.modalOverlay}>
-          <div style={styles.modalCard}>
+          <div className="modal-card">
             <div style={styles.modalHeader}>
               <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#0f172a' }}>🔒 ARQUEO Y CIERRE DE TURNO</h3>
               <button onClick={() => setShowCierreModal(false)} style={styles.btnCloseModal}>✕</button>
@@ -396,7 +499,6 @@ const CajaHome = () => {
                 <strong style={{ fontSize: '1.1rem', color: '#166534' }}>${efectivoEsperadoEnCaja.toFixed(2)}</strong>
               </div>
 
-              {/* INPUT PARA INGRESAR EFECTIVO REAL FÍSICO */}
               <div style={{ marginTop: '8px' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#334155', display: 'block', marginBottom: '4px' }}>
                   💵 Efectivo Real Contado en Caja ($):
@@ -410,7 +512,6 @@ const CajaHome = () => {
                 />
               </div>
 
-              {/* INDICADOR DE DESCUADRE / DIFERENCIA */}
               {actualCashInput !== '' && (
                 <div style={{
                   padding: '8px',
@@ -440,23 +541,11 @@ const CajaHome = () => {
 };
 
 const styles = {
-  container: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '85vh', gap: '20px', padding: '20px', position: 'relative' },
-  topInfoBar: { display: 'flex', gap: '15px', alignItems: 'center', backgroundColor: '#ffffff', padding: '8px 16px', borderRadius: '20px', border: '1px solid #cbd5e1', fontSize: '0.85rem', color: '#334155', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
   btnLinkEdit: { background: 'none', border: 'none', color: '#0284c7', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.8rem', padding: 0 },
-  buttonsGrid: { display: 'flex', flexWrap: 'wrap', gap: '18px', justifyContent: 'center', alignItems: 'center', maxWidth: '700px' },
-  btnCircle: { borderRadius: '50%', border: 'none', color: '#ffffff', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0px 4px 10px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', transition: 'transform 0.2s ease, box-shadow 0.2s ease' },
-  btnGreen: { backgroundColor: '#2e7d32', width: '150px', height: '150px', fontSize: '1.1rem' },
-  btnBlue: { backgroundColor: '#0284c7', width: '150px', height: '150px', fontSize: '1.05rem' },
-  btnOrange: { backgroundColor: '#ea580c', width: '140px', height: '140px', fontSize: '0.95rem' },
-  btnSky: { backgroundColor: '#0284c7', width: '140px', height: '140px', fontSize: '0.95rem' },
-  btnYellow: { backgroundColor: '#f57f17', width: '140px', height: '140px', fontSize: '1rem' },
-  btnRed: { backgroundColor: '#c62828', width: '120px', height: '120px', fontSize: '0.9rem' },
-  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.65)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '20px' },
-  modalContent: { backgroundColor: '#f8fafc', width: '100%', maxWidth: '1100px', maxHeight: '90vh', borderRadius: '12px', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)', overflow: 'hidden' },
-  modalCard: { backgroundColor: '#ffffff', width: '100%', maxWidth: '420px', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)' },
+  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.65)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '15px' },
   modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '8px', borderBottom: '1px solid #e2e8f0' },
   btnCloseModal: { backgroundColor: '#e2e8f0', color: '#334155', border: 'none', padding: '6px 12px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem' },
-  modalBody: { padding: '20px', overflowY: 'auto', flex: 1 },
+  modalBody: { padding: '15px', overflowY: 'auto', flex: 1 },
   resumenRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.9rem', color: '#334155' },
   inputForm: { padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.95rem', width: '100%', boxSizing: 'border-box' },
   btnConfirmarVerde: { width: '100%', padding: '12px', backgroundColor: '#15803d', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.95rem', cursor: 'pointer' },
