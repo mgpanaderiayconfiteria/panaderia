@@ -9,7 +9,7 @@ import Login from './pages/Login';
 import CajaHome from './pages/CajaHome';
 import NuevoCliente from './pages/NuevoCliente';
 import UltimosMovimientos from './pages/UltimosMovimientos';
-import AdminPanel from './components/AdminPanel';
+import AdminPanel from './pages/AdminPanel'; // Ajustado a la carpeta /pages/ si corresponde
 
 function ProtectedRoute({ children, roleRequired }) {
   const { user, isAdmin } = useContext(AuthContext);
