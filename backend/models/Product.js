@@ -12,19 +12,25 @@ const productSchema = new mongoose.Schema({
     enum: ['Panadería', 'Facturería', 'Repostería', 'Cafetería', 'Especialidades'],
     default: 'Panadería'
   },
-  // Habilitadores de modalidades de venta
+
+  // Habilitadores independientes de modalidades de venta
   allowByUnit: {
     type: Boolean,
     default: true
   },
   allowByWeight: {
     type: Boolean,
-    default: true
+    default: false
+  },
+  allowByPorcion: {
+    type: Boolean,
+    default: false
   },
   allowByAmount: {
     type: Boolean,
-    default: true
+    default: false
   },
+
   // Precios de referencia según la modalidad elegida en caja
   priceUnit: {
     type: Number,
@@ -36,18 +42,42 @@ const productSchema = new mongoose.Schema({
     default: 0,
     min: 0
   },
-  // El precio base retrocompatible por si el punto de venta busca 'price'
+  pricePorcion: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
   price: {
     type: Number,
     required: [true, 'El precio de venta es obligatorio'],
+    default: 0,
     min: 0
   },
+
   cogs: {
     type: Number,
     default: 0,
     min: 0
   },
-  // El stock se almacena unificado (ej: en gramos para productos pesables o en unidades)
+
+  // Stocks independientes por tipo de unidad
+  stockUnits: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  stockGrams: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  stockPorciones: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+
+  // Campos retrocompatibles
   stock: {
     type: Number,
     default: 0,
@@ -56,8 +86,17 @@ const productSchema = new mongoose.Schema({
   stockUnit: {
     type: String,
     enum: ['un', 'gr', 'kg', 'porcion'],
-    default: 'gr'
+    default: 'un'
   },
+  sellType: {
+    type: String,
+    default: 'unidad'
+  },
+  unit: {
+    type: String,
+    default: 'un'
+  },
+
   image: {
     type: String,
     default: ''

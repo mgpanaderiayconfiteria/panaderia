@@ -1,6 +1,5 @@
 const Product = require('../models/Product');
 
-// Obtener todos los productos
 exports.getProducts = async (req, res) => {
   console.log('🔍 [PRODUCTOS] Consultando catálogo completo...');
   try {
@@ -13,42 +12,67 @@ exports.getProducts = async (req, res) => {
   }
 };
 
-// Crear un nuevo producto con modalidades de venta dinámicas
 exports.createProduct = async (req, res) => {
   const logData = { ...req.body, image: req.body.image ? '[BASE64_IMAGE]' : '' };
   console.log('📝 [PRODUCTOS] Intentando crear producto con datos:', JSON.stringify(logData));
 
   try {
-    const { 
-      name, 
-      category, 
-      allowByUnit, 
-      allowByWeight, 
-      allowByAmount, 
-      priceUnit, 
-      priceKg, 
-      price, 
-      cogs, 
-      stock, 
-      stockUnit, 
-      image 
+    const {
+      name,
+      category,
+      allowByUnit,
+      allowByWeight,
+      allowByPorcion,
+      allowByAmount,
+      priceUnit,
+      priceKg,
+      pricePorcion,
+      cogs,
+      stockUnits,
+      stockGrams,
+      stockPorciones,
+      image
     } = req.body;
 
-    // Aseguramos que 'price' tenga un valor por defecto válido tomando priceKg o priceUnit
-    const mainPrice = price || priceKg || priceUnit || 0;
+    const parsedPriceUnit = parseFloat(priceUnit || 0);
+    const parsedPriceKg = parseFloat(priceKg || 0);
+    const parsedPricePorcion = parseFloat(pricePorcion || 0);
+
+    const mainPrice = parsedPriceUnit || parsedPriceKg || parsedPricePorcion || 0;
+
+    let primaryStock = 0;
+    let primaryStockUnit = 'un';
+
+    if (allowByUnit) {
+      primaryStock = parseFloat(stockUnits || 0);
+      primaryStockUnit = 'un';
+    } else if (allowByWeight) {
+      primaryStock = parseFloat(stockGrams || 0);
+      primaryStockUnit = 'gr';
+    } else if (allowByPorcion) {
+      primaryStock = parseFloat(stockPorciones || 0);
+      primaryStockUnit = 'porcion';
+    }
 
     const newProduct = new Product({
       name,
-      category,
-      allowByUnit: allowByUnit ?? true,
-      allowByWeight: allowByWeight ?? true,
-      allowByAmount: allowByAmount ?? true,
-      priceUnit: priceUnit || 0,
-      priceKg: priceKg || 0,
+      category: category || 'Panadería',
+      allowByUnit: Boolean(allowByUnit),
+      allowByWeight: Boolean(allowByWeight),
+      allowByPorcion: Boolean(allowByPorcion),
+      allowByAmount: Boolean(allowByAmount),
+      priceUnit: parsedPriceUnit,
+      priceKg: parsedPriceKg,
+      pricePorcion: parsedPricePorcion,
       price: mainPrice,
-      cogs: cogs || 0,
-      stock: stock || 0,
-      stockUnit: stockUnit || 'gr',
+      cogs: parseFloat(cogs || 0),
+      stockUnits: parseFloat(stockUnits || 0),
+      stockGrams: parseFloat(stockGrams || 0),
+      stockPorciones: parseFloat(stockPorciones || 0),
+      stock: primaryStock,
+      stockUnit: primaryStockUnit,
+      sellType: allowByWeight ? 'peso' : allowByPorcion ? 'porcion' : 'unidad',
+      unit: primaryStockUnit,
       image: image || ''
     });
 
@@ -56,19 +80,43 @@ exports.createProduct = async (req, res) => {
     console.log('✅ [PRODUCTOS] Producto creado exitosamente con ID:', savedProduct._id);
     res.status(201).json(savedProduct);
   } catch (error) {
-    console.error('❌ [PRODUCTOS ERROR] Error de validación o guardado en createProduct:', error.message);
+    console.error('❌ [PRODUCTOS ERROR] Error en createProduct:', error.message);
     res.status(400).json({ message: 'Error al crear el producto', error: error.message });
   }
 };
 
-// Actualizar un producto
 exports.updateProduct = async (req, res) => {
   const { id } = req.params;
   console.log(`✏️ [PRODUCTOS] Intentando actualizar producto ID: ${id}`);
   try {
+    const {
+      priceUnit,
+      priceKg,
+      pricePorcion,
+      allowByUnit,
+      allowByWeight,
+      allowByPorcion,
+      stockUnits,
+      stockGrams,
+      stockPorciones
+    } = req.body;
+
+    const parsedPriceUnit = parseFloat(priceUnit || 0);
+    const parsedPriceKg = parseFloat(priceKg || 0);
+    const parsedPricePorcion = parseFloat(pricePorcion || 0);
+
     const updateData = { ...req.body };
-    if (!updateData.price && (updateData.priceKg || updateData.priceUnit)) {
-      updateData.price = updateData.priceKg || updateData.priceUnit;
+    updateData.price = parsedPriceUnit || parsedPriceKg || parsedPricePorcion || req.body.price || 0;
+
+    if (allowByUnit) {
+      updateData.stock = parseFloat(stockUnits || 0);
+      updateData.stockUnit = 'un';
+    } else if (allowByWeight) {
+      updateData.stock = parseFloat(stockGrams || 0);
+      updateData.stockUnit = 'gr';
+    } else if (allowByPorcion) {
+      updateData.stock = parseFloat(stockPorciones || 0);
+      updateData.stockUnit = 'porcion';
     }
 
     const updatedProduct = await Product.findByIdAndUpdate(
@@ -90,7 +138,6 @@ exports.updateProduct = async (req, res) => {
   }
 };
 
-// Eliminar un producto
 exports.deleteProduct = async (req, res) => {
   const { id } = req.params;
   console.log(`🗑️ [PRODUCTOS] Intentando eliminar producto ID: ${id}`);
