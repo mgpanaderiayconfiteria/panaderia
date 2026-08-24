@@ -13,31 +13,42 @@ exports.getProducts = async (req, res) => {
   }
 };
 
-// Crear un nuevo producto
+// Crear un nuevo producto con modalidades de venta dinámicas
 exports.createProduct = async (req, res) => {
-  // Evitamos imprimir en consola la cadena completa Base64 para mantener limpios los logs
   const logData = { ...req.body, image: req.body.image ? '[BASE64_IMAGE]' : '' };
   console.log('📝 [PRODUCTOS] Intentando crear producto con datos:', JSON.stringify(logData));
 
   try {
-    const { name, category, sellType, unit, price, cogs, stock, image } = req.body;
-    
-    // Mapeo por defecto de unidades según el tipo de venta
-    let finalUnit = unit;
-    if (!finalUnit) {
-      if (sellType === 'peso') finalUnit = 'kg';
-      else if (sellType === 'porcion') finalUnit = 'porcion';
-      else finalUnit = 'un';
-    }
+    const { 
+      name, 
+      category, 
+      allowByUnit, 
+      allowByWeight, 
+      allowByAmount, 
+      priceUnit, 
+      priceKg, 
+      price, 
+      cogs, 
+      stock, 
+      stockUnit, 
+      image 
+    } = req.body;
+
+    // Aseguramos que 'price' tenga un valor por defecto válido tomando priceKg o priceUnit
+    const mainPrice = price || priceKg || priceUnit || 0;
 
     const newProduct = new Product({
       name,
       category,
-      sellType: sellType || 'unidad',
-      unit: finalUnit,
-      price,
-      cogs,
-      stock,
+      allowByUnit: allowByUnit ?? true,
+      allowByWeight: allowByWeight ?? true,
+      allowByAmount: allowByAmount ?? true,
+      priceUnit: priceUnit || 0,
+      priceKg: priceKg || 0,
+      price: mainPrice,
+      cogs: cogs || 0,
+      stock: stock || 0,
+      stockUnit: stockUnit || 'gr',
       image: image || ''
     });
 
@@ -50,14 +61,19 @@ exports.createProduct = async (req, res) => {
   }
 };
 
-// Actualizar un producto (precio, stock, modalidad de venta, imagen, etc.)
+// Actualizar un producto
 exports.updateProduct = async (req, res) => {
   const { id } = req.params;
   console.log(`✏️ [PRODUCTOS] Intentando actualizar producto ID: ${id}`);
   try {
+    const updateData = { ...req.body };
+    if (!updateData.price && (updateData.priceKg || updateData.priceUnit)) {
+      updateData.price = updateData.priceKg || updateData.priceUnit;
+    }
+
     const updatedProduct = await Product.findByIdAndUpdate(
       id,
-      req.body,
+      updateData,
       { new: true, runValidators: true }
     );
 
