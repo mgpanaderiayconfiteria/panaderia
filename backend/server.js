@@ -10,6 +10,7 @@ const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const productRoutes = require('./routes/productRoutes');
 const orderRoutes = require('./routes/orderRoutes');
+const shiftRoutes = require('./routes/shiftRoutes'); // 👈 Importado
 
 const app = express();
 
@@ -60,6 +61,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/shifts', shiftRoutes); // 👈 Montado para cierres y mermas
 
 // Función para inicializar la cuenta Admin
 const initAdmin = async () => {
