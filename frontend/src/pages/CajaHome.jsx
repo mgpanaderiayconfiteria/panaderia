@@ -11,7 +11,7 @@ const CajaHome = () => {
   const navigate = useNavigate();
   const { sales } = useContext(SaleContext);
   const { user } = useContext(AuthContext);
-  const { products, fetchProducts } = useContext(ProductContext);
+  const { products, fetchProducts, addProduct } = useContext(ProductContext);
 
   // Estados de Modales
   const [showCatalog, setShowCatalog] = useState(false);
@@ -26,7 +26,16 @@ const CajaHome = () => {
   const [actualCashInput, setActualCashInput] = useState(''); // Efectivo real contado al cerrar
   const [selectedWasteProd, setSelectedWasteProd] = useState('');
   const [wasteQty, setWasteQty] = useState('');
-  const [newProd, setNewProd] = useState({ name: '', price: '', cost: '', stock: '', category: 'Panadería' });
+  
+  // Estado para el alta exprés del producto con soporte para tipos de venta
+  const [newProd, setNewProd] = useState({ 
+    name: '', 
+    price: '', 
+    cost: '', 
+    stock: '', 
+    category: 'Panadería',
+    sellType: 'unidad' 
+  });
 
   // Verificar si hay fondo de caja guardado al iniciar
   useEffect(() => {
@@ -102,20 +111,34 @@ const CajaHome = () => {
       alert('Nombre y precio de venta son obligatorios.');
       return;
     }
-    try {
-      const res = await fetch(`${API_URL}/api/products`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newProd)
-      });
-      if (res.ok) {
-        alert('📦 Producto dado de alta correctamente.');
-        setShowQuickProdModal(false);
-        setNewProd({ name: '', price: '', cost: '', stock: '', category: 'Panadería' });
-        if (fetchProducts) fetchProducts();
-      }
-    } catch (e) {
-      alert('Error de conexión al dar de alta el producto.');
+
+    const priceNum = parseFloat(newProd.price) || 0;
+    const stockNum = parseFloat(newProd.stock) || 0;
+    const costNum = parseFloat(newProd.cost) || 0;
+
+    const payload = {
+      name: newProd.name.trim(),
+      category: newProd.category,
+      cogs: costNum,
+      sellType: newProd.sellType,
+      allowByUnit: newProd.sellType === 'unidad',
+      allowByWeight: newProd.sellType === 'peso',
+      allowByPorcion: newProd.sellType === 'porcion',
+      priceUnit: newProd.sellType === 'unidad' ? priceNum : 0,
+      priceKg: newProd.sellType === 'peso' ? priceNum : 0,
+      pricePorcion: newProd.sellType === 'porcion' ? priceNum : 0,
+      price: priceNum,
+      stockUnits: newProd.sellType === 'unidad' ? stockNum : 0,
+      stockGrams: newProd.sellType === 'peso' ? stockNum : 0,
+      stockPorciones: newProd.sellType === 'porcion' ? stockNum : 0,
+      stock: stockNum
+    };
+
+    const saved = await addProduct(payload);
+    if (saved) {
+      alert('📦 Producto dado de alta e incorporado al catálogo.');
+      setShowQuickProdModal(false);
+      setNewProd({ name: '', price: '', cost: '', stock: '', category: 'Panadería', sellType: 'unidad' });
     }
   };
 
@@ -272,6 +295,7 @@ const CajaHome = () => {
               <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>📦 RECEPCIÓN EXPRÉS PROVEEDOR</h3>
               <button onClick={() => setShowQuickProdModal(false)} style={styles.btnCloseModal}>✕</button>
             </div>
+
             <input
               type="text"
               placeholder="Nombre del producto"
@@ -279,27 +303,58 @@ const CajaHome = () => {
               onChange={(e) => setNewProd({ ...newProd, name: e.target.value })}
               style={styles.inputForm}
             />
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <select
+                value={newProd.category}
+                onChange={(e) => setNewProd({ ...newProd, category: e.target.value })}
+                style={styles.inputForm}
+              >
+                <option value="Panadería">Panadería</option>
+                <option value="Facturería">Facturería</option>
+                <option value="Repostería">Repostería</option>
+                <option value="Cafetería">Cafetería</option>
+                <option value="Especialidades">Especialidades</option>
+              </select>
+
+              <select
+                value={newProd.sellType}
+                onChange={(e) => setNewProd({ ...newProd, sellType: e.target.value })}
+                style={styles.inputForm}
+              >
+                <option value="unidad">Por Unidad</option>
+                <option value="peso">Por Peso (Kg/Gr)</option>
+                <option value="porcion">Por Porción</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <input
+                type="number"
+                step="0.01"
+                placeholder="Precio Venta ($)"
+                value={newProd.price}
+                onChange={(e) => setNewProd({ ...newProd, price: e.target.value })}
+                style={styles.inputForm}
+              />
+              <input
+                type="number"
+                step="0.01"
+                placeholder="Costo COGS ($)"
+                value={newProd.cost}
+                onChange={(e) => setNewProd({ ...newProd, cost: e.target.value })}
+                style={styles.inputForm}
+              />
+            </div>
+
             <input
               type="number"
-              placeholder="Precio Venta ($)"
-              value={newProd.price}
-              onChange={(e) => setNewProd({ ...newProd, price: e.target.value })}
-              style={styles.inputForm}
-            />
-            <input
-              type="number"
-              placeholder="Precio Costo ($)"
-              value={newProd.cost}
-              onChange={(e) => setNewProd({ ...newProd, cost: e.target.value })}
-              style={styles.inputForm}
-            />
-            <input
-              type="number"
-              placeholder="Cantidad / Stock recibido"
+              placeholder={`Stock Inicial (${newProd.sellType === 'peso' ? 'Gramos' : 'Unidades'})`}
               value={newProd.stock}
               onChange={(e) => setNewProd({ ...newProd, stock: e.target.value })}
               style={styles.inputForm}
             />
+
             <button onClick={handleQuickAddProduct} style={styles.btnConfirmarAzul}>
               INGRESAR PRODUCTO AL STOCK
             </button>

@@ -38,10 +38,28 @@ export const ProductProvider = ({ children }) => {
 
   const addProduct = async (productData) => {
     try {
+      // Formatear payload para garantizar compatibilidad con el esquema del backend
+      const formattedPayload = {
+        name: productData.name,
+        category: productData.category || 'Panadería',
+        cogs: parseFloat(productData.cogs || productData.cost || 0),
+        allowByUnit: productData.allowByUnit ?? (productData.sellType === 'unidad' || true),
+        allowByWeight: productData.allowByWeight ?? (productData.sellType === 'peso'),
+        allowByPorcion: productData.allowByPorcion ?? (productData.sellType === 'porcion'),
+        priceUnit: parseFloat(productData.priceUnit || (productData.sellType === 'unidad' ? productData.price : 0) || 0),
+        priceKg: parseFloat(productData.priceKg || (productData.sellType === 'peso' ? productData.price : 0) || 0),
+        pricePorcion: parseFloat(productData.pricePorcion || (productData.sellType === 'porcion' ? productData.price : 0) || 0),
+        price: parseFloat(productData.price || 0),
+        stockUnits: parseFloat(productData.stockUnits || (productData.sellType === 'unidad' ? productData.stock : 0) || 0),
+        stockGrams: parseFloat(productData.stockGrams || (productData.sellType === 'peso' ? productData.stock : 0) || 0),
+        stockPorciones: parseFloat(productData.stockPorciones || (productData.sellType === 'porcion' ? productData.stock : 0) || 0),
+        stock: parseFloat(productData.stock || 0)
+      };
+
       const response = await fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(productData)
+        body: JSON.stringify(formattedPayload)
       });
 
       const contentType = response.headers.get('content-type');
@@ -49,14 +67,16 @@ export const ProductProvider = ({ children }) => {
       if (!response.ok || !contentType || !contentType.includes('application/json')) {
         const text = await response.text();
         console.error('⚠️ Error en POST /api/products:', response.status, text);
-        alert(`Error al guardar (${response.status}): Revisá que la API esté activa.`);
-        return;
+        alert(`Error al guardar (${response.status}): Revisá los datos enviados o que la API esté activa.`);
+        return null;
       }
 
       const savedProduct = await response.json();
       setProducts((prev) => [savedProduct, ...prev]);
+      return savedProduct;
     } catch (error) {
       console.error('Error de red en addProduct:', error);
+      return null;
     }
   };
 

@@ -1,135 +1,191 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useContext } from 'react';
+import { ProductContext } from '../context/ProductContext';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-const CajaQuickActions = ({ employeeName, onStockUpdated }) => {
-  const [products, setProducts] = useState([]);
-  const [showWasteModal, setShowWasteModal] = useState(false);
-  const [showProductModal, setShowProductModal] = useState(false);
+const CajaQuickActions = ({ onClose }) => {
+  const { fetchProducts } = useContext(ProductContext);
 
-  // Formulario Desperdicio
-  const [selectedProdId, setSelectedProdId] = useState('');
-  const [wasteQty, setWasteQty] = useState('');
+  const [formData, setFormData] = useState({
+    name: '',
+    category: 'Panadería',
+    sellType: 'unidad', // 'unidad', 'peso', 'porcion'
+    price: '',
+    stock: '',
+    cogs: ''
+  });
 
-  // Formulario Alta Exprés Producto (Proveedor)
-  const [newProd, setNewProd] = useState({ name: '', price: '', cost: '', stock: '', category: 'Panadería' });
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
-  useEffect(() => {
-    fetch(`${API_URL}/api/products`)
-      .then(res => res.json())
-      .then(data => setProducts(data))
-      .catch(err => console.error(err));
-  }, []);
-
-  const handleRegisterWaste = async () => {
-    if (!selectedProdId || !wasteQty) return;
-    try {
-      const res = await fetch(`${API_URL}/api/shifts/waste`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          productId: selectedProdId,
-          quantity: wasteQty,
-          employee: employeeName,
-          reason: 'Sobrante del día de panadería'
-        })
-      });
-      if (res.ok) {
-        alert('✅ Desperdicio registrado e impactado en el Log del Administrador.');
-        setShowWasteModal(false);
-        setWasteQty('');
-        if (onStockUpdated) onStockUpdated();
-      }
-    } catch (e) {
-      alert('Error al registrar desperdicio');
-    }
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleQuickAddProduct = async () => {
-    if (!newProd.name || !newProd.price) return;
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setErrorMsg('');
+
+    const priceNum = parseFloat(formData.price) || 0;
+    const stockNum = parseFloat(formData.stock) || 0;
+    const cogsNum = parseFloat(formData.cogs) || 0;
+
+    if (!formData.name.trim() || priceNum <= 0) {
+      setErrorMsg('Ingresa un nombre y precio válidos.');
+      setLoading(false);
+      return;
+    }
+
+    // Estructurar payload exacto que requiere createProduct en el backend
+    const payload = {
+      name: formData.name.trim(),
+      category: formData.category,
+      cogs: cogsNum,
+      allowByUnit: formData.sellType === 'unidad',
+      allowByWeight: formData.sellType === 'peso',
+      allowByPorcion: formData.sellType === 'porcion',
+      priceUnit: formData.sellType === 'unidad' ? priceNum : 0,
+      priceKg: formData.sellType === 'peso' ? priceNum : 0,
+      pricePorcion: formData.sellType === 'porcion' ? priceNum : 0,
+      stockUnits: formData.sellType === 'unidad' ? stockNum : 0,
+      stockGrams: formData.sellType === 'peso' ? stockNum : 0,
+      stockPorciones: formData.sellType === 'porcion' ? stockNum : 0
+    };
+
     try {
       const res = await fetch(`${API_URL}/api/products`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newProd)
+        body: JSON.stringify(payload)
       });
-      if (res.ok) {
-        alert('📦 Producto ingresado correctamente al sistema');
-        setShowProductModal(false);
-        setNewProd({ name: '', price: '', cost: '', stock: '', category: 'Panadería' });
-        if (onStockUpdated) onStockUpdated();
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Error al guardar el producto');
       }
-    } catch (e) {
-      alert('Error al dar de alta el producto');
+
+      await fetchProducts(); // Recargar catálogo en pantalla de caja
+      onClose();
+    } catch (err) {
+      setErrorMsg(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div style={{ display: 'flex', gap: '12px', margin: '12px 0' }}>
-      <button onClick={() => setShowWasteModal(true)} style={styles.btnWaste}>
-        🗑️ Registrar Sobrante / Desperdicio
-      </button>
-      <button onClick={() => setShowProductModal(true)} style={styles.btnAdd}>
-        📦 Alta Exprés (Recepción Proveedor)
-      </button>
+    <div style={styles.overlay}>
+      <div style={styles.modal}>
+        <div style={styles.header}>
+          <h3>⚡ Alta Rápida de Producto (Caja)</h3>
+          <button onClick={onClose} style={styles.btnClose}>✕</button>
+        </div>
 
-      {/* MODAL REGISTRO DE DESPERDICIO */}
-      {showWasteModal && (
-        <div style={styles.overlay}>
-          <div style={styles.modal}>
-            <h3>🗑️ Registrar Sobrante del Día</h3>
-            <p style={{ fontSize: '0.85rem', color: '#64748b' }}>
-              Seleccione los productos que no se vendieron y deben retirarse del stock.
-            </p>
-            <select value={selectedProdId} onChange={e => setSelectedProdId(e.target.value)} style={styles.input}>
-              <option value="">-- Seleccionar Producto --</option>
-              {products.map(p => (
-                <option key={p._id} value={p._id}>{p.name} (Stock: {p.stock || 0})</option>
-              ))}
-            </select>
+        {errorMsg && <div style={styles.error}>{errorMsg}</div>}
+
+        <form onSubmit={handleSubmit} style={styles.form}>
+          <label style={styles.label}>
+            Nombre del Producto:
             <input
-              type="number"
-              placeholder="Cantidad / Unidades / Gramos a descartar"
-              value={wasteQty}
-              onChange={e => setWasteQty(e.target.value)}
+              type="text"
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              placeholder="Ej: Criollitos integrales"
+              required
               style={styles.input}
             />
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={() => setShowWasteModal(false)} style={styles.btnCancel}>Cancelar</button>
-              <button onClick={handleRegisterWaste} style={styles.btnConfirm}>Confirmar Baja</button>
-            </div>
-          </div>
-        </div>
-      )}
+          </label>
 
-      {/* MODAL ALTA EXPRÉS PRODUCTO */}
-      {showProductModal && (
-        <div style={styles.overlay}>
-          <div style={styles.modal}>
-            <h3>📦 Alta Rápida de Producto / Mercadería</h3>
-            <input type="text" placeholder="Nombre del producto" value={newProd.name} onChange={e => setNewProd({...newProd, name: e.target.value})} style={styles.input} />
-            <input type="number" placeholder="Precio de Venta ($)" value={newProd.price} onChange={e => setNewProd({...newProd, price: e.target.value})} style={styles.input} />
-            <input type="number" placeholder="Precio de Costo ($)" value={newProd.cost} onChange={e => setNewProd({...newProd, cost: e.target.value})} style={styles.input} />
-            <input type="number" placeholder="Cantidad / Stock Ingresado" value={newProd.stock} onChange={e => setNewProd({...newProd, stock: e.target.value})} style={styles.input} />
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={() => setShowProductModal(false)} style={styles.btnCancel}>Cancelar</button>
-              <button onClick={handleQuickAddProduct} style={styles.btnConfirm}>Guardar Producto</button>
-            </div>
+          <div style={styles.row}>
+            <label style={styles.label}>
+              Categoría:
+              <select name="category" value={formData.category} onChange={handleChange} style={styles.input}>
+                <option value="Panadería">Panadería</option>
+                <option value="Facturería">Facturería</option>
+                <option value="Repostería">Repostería</option>
+                <option value="Cafetería">Cafetería</option>
+                <option value="Especialidades">Especialidades</option>
+              </select>
+            </label>
+
+            <label style={styles.label}>
+              Tipo de Venta:
+              <select name="sellType" value={formData.sellType} onChange={handleChange} style={styles.input}>
+                <option value="unidad">Por Unidad</option>
+                <option value="peso">Por Peso (Kg/Gr)</option>
+                <option value="porcion">Por Porción</option>
+              </select>
+            </label>
           </div>
-        </div>
-      )}
+
+          <div style={styles.row}>
+            <label style={styles.label}>
+              Precio ($):
+              <input
+                type="number"
+                step="0.01"
+                name="price"
+                value={formData.price}
+                onChange={handleChange}
+                placeholder="0.00"
+                required
+                style={styles.input}
+              />
+            </label>
+
+            <label style={styles.label}>
+              Stock Inicial ({formData.sellType === 'peso' ? 'Gramos' : 'Unidades'}):
+              <input
+                type="number"
+                name="stock"
+                value={formData.stock}
+                onChange={handleChange}
+                placeholder="0"
+                style={styles.input}
+              />
+            </label>
+          </div>
+
+          <label style={styles.label}>
+            Costo Estimado / COGS ($) (Opcional):
+            <input
+              type="number"
+              step="0.01"
+              name="cogs"
+              value={formData.cogs}
+              onChange={handleChange}
+              placeholder="0.00"
+              style={styles.input}
+            />
+          </label>
+
+          <div style={styles.actions}>
+            <button type="button" onClick={onClose} style={styles.btnCancel}>Cancelar</button>
+            <button type="submit" disabled={loading} style={styles.btnSubmit}>
+              {loading ? 'Guardando...' : 'Crear e Iniciar Venta'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };
 
 const styles = {
-  btnWaste: { padding: '10px 16px', backgroundColor: '#ef4444', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' },
-  btnAdd: { padding: '10px 16px', backgroundColor: '#0284c7', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' },
-  overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200 },
-  modal: { backgroundColor: '#fff', padding: '24px', borderRadius: '12px', width: '400px', display: 'flex', flexDirection: 'column', gap: '12px' },
-  input: { padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.95rem' },
-  btnCancel: { flex: 1, padding: '10px', backgroundColor: '#e2e8f0', border: 'none', borderRadius: '6px', cursor: 'pointer' },
-  btnConfirm: { flex: 1, padding: '10px', backgroundColor: '#15803d', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }
+  overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1500 },
+  modal: { backgroundColor: '#fff', padding: '20px', borderRadius: '12px', width: '100%', maxWidth: '500px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' },
+  btnClose: { background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer' },
+  form: { display: 'flex', flexDirection: 'column', gap: '12px' },
+  row: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' },
+  label: { fontSize: '0.85rem', fontWeight: 'bold', color: '#334155', display: 'flex', flexDirection: 'column', gap: '4px' },
+  input: { padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.9rem' },
+  actions: { display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' },
+  btnCancel: { padding: '8px 16px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' },
+  btnSubmit: { padding: '8px 16px', borderRadius: '6px', border: 'none', background: '#16a34a', color: '#fff', fontWeight: 'bold', cursor: 'pointer' },
+  error: { backgroundColor: '#fef2f2', color: '#991b1b', padding: '8px', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '10px' }
 };
 
 export default CajaQuickActions;
