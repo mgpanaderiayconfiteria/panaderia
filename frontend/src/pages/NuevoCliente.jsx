@@ -13,6 +13,9 @@ const NuevoCliente = () => {
   const categories = ['Panadería', 'Facturería', 'Repostería', 'Cafetería', 'Especialidades'];
   const [activeCategory, setActiveCategory] = useState('Panadería');
   const [selectedProduct, setSelectedProduct] = useState(null);
+
+  // Estado para controlar la pestaña activa: 'catalog' o 'cart'
+  const [activeTab, setActiveTab] = useState('catalog');
   
   // Estados de Carrito y Pop-ups
   const [cart, setCart] = useState([]);
@@ -30,7 +33,6 @@ const NuevoCliente = () => {
 
   const handleSelectProduct = (product) => {
     setSelectedProduct(product);
-    // Establecer modalidad inicial según datos o por defecto a 'weight' o 'unit'
     if (product.allowByWeight) setSellMode('weight');
     else if (product.allowByUnit) setSellMode('unit');
     else if (product.allowByPorcion || product.allowByPortion) setSellMode('portion');
@@ -42,8 +44,6 @@ const NuevoCliente = () => {
   const calculatedSubtotal = useMemo(() => {
     if (!selectedProduct || !quantity || isNaN(parseFloat(quantity))) return 0;
     const val = parseFloat(quantity);
-    
-    // Buscar el precio base disponible en el producto
     const basePrice = parseFloat(selectedProduct.price || selectedProduct.priceUnit || selectedProduct.priceKg || 0);
 
     if (sellMode === 'unit') return val * parseFloat(selectedProduct.priceUnit || basePrice);
@@ -80,14 +80,13 @@ const NuevoCliente = () => {
   };
 
   const totalCart = useMemo(() => cart.reduce((acc, item) => acc + item.subtotal, 0), [cart]);
+  const totalItemsCount = useMemo(() => cart.length, [cart]);
   
-  // Cálculo de Vuelto
   const changeAmount = useMemo(() => {
     const given = parseFloat(cashGiven) || 0;
     return given >= totalCart ? given - totalCart : 0;
   }, [cashGiven, totalCart]);
 
-  // Finalizar la compra y registrar en MongoDB a través del SaleContext
   const handleConfirmCashSale = async () => {
     const given = parseFloat(cashGiven) || 0;
     if (given < totalCart) return;
@@ -105,7 +104,6 @@ const NuevoCliente = () => {
       changeAmount: changeAmount
     });
 
-    // Resetear estados y volver a la pantalla de CajaHome
     setShowCheckoutModal(false);
     setCart([]);
     setCashGiven('');
@@ -114,82 +112,212 @@ const NuevoCliente = () => {
   };
 
   return (
-    <div style={styles.container}>
-      
-      {/* TABLERO POS */}
-      <div style={styles.posPanel}>
-        <div style={styles.categoryBar}>
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setActiveCategory(cat)}
-              style={{
-                ...styles.categoryTab,
-                backgroundColor: activeCategory === cat ? '#1b4332' : '#ffffff',
-                color: activeCategory === cat ? '#ffffff' : '#334155',
-                border: activeCategory === cat ? '2px solid #1b4332' : '1px solid #cbd5e1'
-              }}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
+    <div className="pos-tabbed-container">
+      <style>{`
+        .pos-tabbed-container {
+          display: flex;
+          flex-direction: column;
+          min-height: 100dvh;
+          width: 100%;
+          background-color: #f1f5f9;
+          box-sizing: border-box;
+          position: relative;
+          padding-bottom: ${cart.length > 0 && activeTab === 'catalog' ? '70px' : '0px'};
+        }
 
-        <div style={styles.productGrid}>
-          {categoryProducts.map((p) => {
-            const prodId = p._id || p.id;
-            return (
-              <div key={prodId} onClick={() => handleSelectProduct(p)} style={styles.productCard}>
-                {p.image ? <img src={p.image} alt={p.name} style={styles.cardImg} /> : <div style={styles.noCardImg}>🥐</div>}
-                <div style={styles.cardFooter}>
-                  <span style={styles.cardTitle}>{p.name}</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+        .header-nav {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 10px 14px;
+          background-color: #ffffff;
+          border-bottom: 1px solid #cbd5e1;
+        }
 
-      {/* CARRITO Y COBRO */}
-      <div style={styles.cartPanel}>
-        <div style={styles.cartHeader}>
-          <button onClick={() => navigate('/caja')} style={styles.btnVolver}>← Volver</button>
-          <h2 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>🛒 PEDIDO ACTUAL</h2>
-        </div>
+        .category-bar {
+          display: flex;
+          gap: 8px;
+          overflow-x: auto;
+          padding: 10px 14px 4px 14px;
+          -webkit-overflow-scrolling: touch;
+        }
 
-        <div style={styles.cartItemsContainer}>
-          {cart.length === 0 ? (
-            <div style={styles.emptyCart}><span>Tocá un producto para agregarlo al pedido</span></div>
-          ) : (
-            cart.map((item) => (
-              <div key={item.id} style={styles.cartItemRow}>
-                <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                  <strong style={{ fontSize: '0.95rem', color: '#0f172a' }}>{item.name}</strong>
-                  <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{item.detailLabel}</span>
-                </div>
-                <strong style={{ fontSize: '1rem', color: '#166534', marginRight: '10px' }}>${item.subtotal.toFixed(2)}</strong>
-                <button onClick={() => setCart(cart.filter(i => i.id !== item.id))} style={styles.btnDelete}>✕</button>
-              </div>
-            ))
-          )}
-        </div>
+        .product-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+          gap: 10px;
+          padding: 12px 14px;
+        }
 
-        <div style={styles.cartFooter}>
-          <div style={styles.totalRow}>
-            <span>TOTAL:</span>
-            <strong style={{ fontSize: '1.5rem', color: '#1b4332' }}>${totalCart.toFixed(2)}</strong>
-          </div>
+        /* PESTAÑA CARRITO */
+        .cart-tab-view {
+          display: flex;
+          flex-direction: column;
+          flex: 1;
+          padding: 14px;
+          max-width: 600px;
+          margin: 0 auto;
+          width: 100%;
+          box-sizing: border-box;
+        }
+
+        /* BARRA FLOTANTE INFERIOR */
+        .bottom-floating-bar {
+          position: fixed;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          background-color: #1b4332;
+          color: #ffffff;
+          padding: 12px 16px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          box-shadow: 0 -4px 12px rgba(0,0,0,0.15);
+          z-index: 100;
+          cursor: pointer;
+        }
+
+        @media (min-width: 768px) {
+          .product-grid {
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 14px;
+          }
+        }
+      `}</style>
+
+      {/* HEADER PRINCIPAL */}
+      <div className="header-nav">
+        <button onClick={() => navigate('/caja')} style={styles.btnVolver}>← Salir a Caja</button>
+        
+        {/* NAVEGACIÓN ENTRE PESTAÑAS */}
+        <div style={{ display: 'flex', gap: '6px' }}>
           <button
-            onClick={() => { setShowCheckoutModal(true); setPaymentStep('select_method'); }}
-            disabled={cart.length === 0}
-            style={{ ...styles.btnFinalizar, backgroundColor: cart.length === 0 ? '#cbd5e1' : '#2e7d32', cursor: cart.length === 0 ? 'not-allowed' : 'pointer' }}
+            onClick={() => setActiveTab('catalog')}
+            style={{
+              ...styles.tabSwitchBtn,
+              backgroundColor: activeTab === 'catalog' ? '#0f172a' : '#e2e8f0',
+              color: activeTab === 'catalog' ? '#ffffff' : '#334155'
+            }}
           >
-            PAGAR Y FINALIZAR
+            🥐 Catálogo
+          </button>
+          <button
+            onClick={() => setActiveTab('cart')}
+            style={{
+              ...styles.tabSwitchBtn,
+              backgroundColor: activeTab === 'cart' ? '#0f172a' : '#e2e8f0',
+              color: activeTab === 'cart' ? '#ffffff' : '#334155'
+            }}
+          >
+            🛒 Pedido ({totalItemsCount})
           </button>
         </div>
       </div>
 
-      {/* POP-UP SELECCIÓN DE CANTIDAD/PESO (Con las 4 modalidades habilitadas para todos los productos) */}
+      {/* PESTAÑA 1: CATÁLOGO DE PRODUCTOS */}
+      {activeTab === 'catalog' && (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div className="category-bar">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                style={{
+                  ...styles.categoryTab,
+                  backgroundColor: activeCategory === cat ? '#1b4332' : '#ffffff',
+                  color: activeCategory === cat ? '#ffffff' : '#334155',
+                  border: activeCategory === cat ? '2px solid #1b4332' : '1px solid #cbd5e1'
+                }}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          <div className="product-grid">
+            {categoryProducts.map((p) => {
+              const prodId = p._id || p.id;
+              return (
+                <div key={prodId} onClick={() => handleSelectProduct(p)} style={styles.productCard}>
+                  {p.image ? <img src={p.image} alt={p.name} style={styles.cardImg} /> : <div style={styles.noCardImg}>🥐</div>}
+                  <div style={styles.cardFooter}>
+                    <span style={styles.cardTitle}>{p.name}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* BARRA FLOTANTE EN CATÁLOGO SI HAY PRODUCTOS EN CARRITO */}
+          {cart.length > 0 && (
+            <div className="bottom-floating-bar" onClick={() => setActiveTab('cart')}>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontSize: '0.8rem', opacity: 0.9 }}>{totalItemsCount} {totalItemsCount === 1 ? 'producto' : 'productos'}</span>
+                <strong style={{ fontSize: '1.2rem' }}>Total: ${totalCart.toFixed(2)}</strong>
+              </div>
+              <button style={styles.btnVerPedido}>Ver Pedido / Pagar ➔</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* PESTAÑA 2: REVISIÓN DEL PEDIDO Y PAGOS */}
+      {activeTab === 'cart' && (
+        <div className="cart-tab-view">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <h2 style={{ margin: 0, fontSize: '1.2rem', color: '#0f172a' }}>DETALLE DEL PEDIDO</h2>
+            <button onClick={() => setActiveTab('catalog')} style={styles.btnAgregarMas}>
+              ➕ Agregar más productos
+            </button>
+          </div>
+
+          <div style={styles.cartItemsContainer}>
+            {cart.length === 0 ? (
+              <div style={styles.emptyCart}>
+                <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '8px' }}>🛒</span>
+                <span>El pedido está vacío. Tocá el botón de arriba para sumar productos desde el catálogo.</span>
+              </div>
+            ) : (
+              cart.map((item) => (
+                <div key={item.id} style={styles.cartItemRow}>
+                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                    <strong style={{ fontSize: '0.95rem', color: '#0f172a' }}>{item.name}</strong>
+                    <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{item.detailLabel}</span>
+                  </div>
+                  <strong style={{ fontSize: '1.05rem', color: '#166534', marginRight: '12px' }}>
+                    ${item.subtotal.toFixed(2)}
+                  </strong>
+                  <button onClick={() => setCart(cart.filter(i => i.id !== item.id))} style={styles.btnDelete}>✕</button>
+                </div>
+              ))
+            )}
+          </div>
+
+          {cart.length > 0 && (
+            <div style={styles.cartSummaryFooter}>
+              <div style={styles.totalRow}>
+                <span>TOTAL A PAGAR:</span>
+                <strong style={{ fontSize: '1.6rem', color: '#1b4332' }}>${totalCart.toFixed(2)}</strong>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                <button onClick={() => setActiveTab('catalog')} style={{ ...styles.btnAgregarMas, flex: 1, padding: '12px' }}>
+                  ← Volver al catálogo
+                </button>
+                <button
+                  onClick={() => { setShowCheckoutModal(true); setPaymentStep('select_method'); }}
+                  style={styles.btnPagarMain}
+                >
+                  PROCEDER AL PAGO ➔
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* MODAL SELECCIÓN DE CANTIDAD/PESO */}
       {selectedProduct && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalCard}>
@@ -198,7 +326,6 @@ const NuevoCliente = () => {
               <button onClick={() => setSelectedProduct(null)} style={styles.btnClose}>✕</button>
             </div>
             
-            {/* Opciones de venta disponibles siempre para que el vendedor elija */}
             <div style={styles.modeSelectorRow}>
               <button onClick={() => { setSellMode('weight'); setQuantity(''); }} style={{ ...styles.modeBtn, backgroundColor: sellMode === 'weight' ? '#0284c7' : '#e2e8f0', color: sellMode === 'weight' ? '#fff' : '#334155' }}>⚖️ Pesado (Gramos)</button>
               <button onClick={() => { setSellMode('unit'); setQuantity(''); }} style={{ ...styles.modeBtn, backgroundColor: sellMode === 'unit' ? '#0284c7' : '#e2e8f0', color: sellMode === 'unit' ? '#fff' : '#334155' }}>🔢 Unidades</button>
@@ -248,7 +375,6 @@ const NuevoCliente = () => {
       {showCheckoutModal && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalCard}>
-            
             <div style={styles.modalHeader}>
               <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#0f172a' }}>COBRO DE PEDIDO</h3>
               <button onClick={() => setShowCheckoutModal(false)} style={styles.btnClose}>✕</button>
@@ -347,42 +473,39 @@ const NuevoCliente = () => {
 };
 
 const styles = {
-  container: { display: 'flex', height: '100vh', width: '100vw', backgroundColor: '#f1f5f9', overflow: 'hidden' },
-  posPanel: { flex: 1, display: 'flex', flexDirection: 'column', padding: '16px', gap: '16px', overflowY: 'auto' },
-  categoryBar: { display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '4px' },
-  categoryTab: { padding: '14px 20px', borderRadius: '10px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s ease' },
-  productGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '14px' },
-  productCard: { backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', overflow: 'hidden', minHeight: '160px' },
-  cardImg: { width: '100%', height: '110px', objectFit: 'cover' },
-  noCardImg: { width: '100%', height: '110px', backgroundColor: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem' },
-  cardFooter: { padding: '10px', textAlign: 'center', width: '100%' },
-  cardTitle: { fontSize: '0.9rem', fontWeight: 'bold', color: '#0f172a', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' },
-  cartPanel: { width: '360px', backgroundColor: '#ffffff', borderLeft: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', boxShadow: '-2px 0 10px rgba(0,0,0,0.03)' },
-  cartHeader: { padding: '16px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f8fafc' },
-  btnVolver: { padding: '8px 14px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', fontWeight: 'bold', cursor: 'pointer' },
-  cartItemsContainer: { flex: 1, padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' },
-  emptyCart: { height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', color: '#94a3b8', fontSize: '0.9rem', padding: '20px' },
+  tabSwitchBtn: { padding: '8px 12px', borderRadius: '8px', border: 'none', fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer' },
+  categoryTab: { padding: '10px 14px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap' },
+  productCard: { backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', overflow: 'hidden', minHeight: '130px' },
+  cardImg: { width: '100%', height: '85px', objectFit: 'cover' },
+  noCardImg: { width: '100%', height: '85px', backgroundColor: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem' },
+  cardFooter: { padding: '6px', textAlign: 'center', width: '100%' },
+  cardTitle: { fontSize: '0.8rem', fontWeight: 'bold', color: '#0f172a', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' },
+  btnVolver: { padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#fff', color: '#334155', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem' },
+  btnVerPedido: { backgroundColor: '#2e7d32', color: '#ffffff', border: 'none', padding: '10px 16px', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.9rem', cursor: 'pointer' },
+  btnAgregarMas: { backgroundColor: '#ffffff', border: '1px solid #0284c7', color: '#0284c7', padding: '8px 12px', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer' },
+  cartItemsContainer: { backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px', minHeight: '200px', maxHeight: '50dvh', overflowY: 'auto' },
+  emptyCart: { padding: '40px 20px', textAlign: 'center', color: '#94a3b8', fontSize: '0.9rem' },
   cartItemRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' },
   btnDelete: { backgroundColor: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: '6px', width: '28px', height: '28px', cursor: 'pointer', fontWeight: 'bold' },
-  cartFooter: { padding: '16px', borderTop: '1px solid #e2e8f0', backgroundColor: '#ffffff', display: 'flex', flexDirection: 'column', gap: '12px' },
+  cartSummaryFooter: { marginTop: '16px', backgroundColor: '#ffffff', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '8px' },
   totalRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '1.1rem', fontWeight: 'bold', color: '#334155' },
-  btnFinalizar: { width: '100%', padding: '16px', borderRadius: '10px', color: '#ffffff', fontWeight: 'bold', fontSize: '1.1rem', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' },
-  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '20px' },
-  modalCard: { backgroundColor: '#ffffff', width: '100%', maxWidth: '480px', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)' },
-  modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '10px' },
-  btnClose: { backgroundColor: '#e2e8f0', border: 'none', borderRadius: '6px', width: '32px', height: '32px', cursor: 'pointer', fontWeight: 'bold' },
-  modeSelectorRow: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
-  modeBtn: { flex: 1, padding: '10px', borderRadius: '8px', border: 'none', fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer' },
-  quickPresetsRow: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
-  presetBtn: { flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', fontSize: '0.8rem', fontWeight: 'bold', color: '#334155', cursor: 'pointer' },
-  inputGroup: { display: 'flex', flexDirection: 'column', gap: '6px' },
-  inputLabel: { fontSize: '0.85rem', fontWeight: 'bold', color: '#475569' },
-  touchInput: { width: '100%', padding: '12px', fontSize: '1.4rem', fontWeight: 'bold', textAlign: 'center', borderRadius: '8px', border: '2px solid #0284c7', outline: 'none' },
-  subtotalDisplay: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderRadius: '8px', border: '1px solid #bbf7d0' },
-  btnAddCart: { width: '100%', padding: '14px', borderRadius: '8px', color: '#fff', fontWeight: 'bold', fontSize: '1rem', border: 'none' },
-  btnMethodCash: { padding: '16px', backgroundColor: '#15803d', color: '#fff', fontWeight: 'bold', fontSize: '1.1rem', borderRadius: '10px', border: 'none', cursor: 'pointer' },
-  btnMethodDigital: { padding: '16px', backgroundColor: '#0284c7', color: '#fff', fontWeight: 'bold', fontSize: '1.1rem', borderRadius: '10px', border: 'none', cursor: 'pointer' },
-  summaryBox: { display: 'flex', justifyContent: 'space-between', backgroundColor: '#f8fafc', padding: '12px', borderRadius: '8px', fontSize: '1.1rem', border: '1px solid #e2e8f0' }
+  btnPagarMain: { flex: 2, padding: '14px', backgroundColor: '#2e7d32', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' },
+  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '15px' },
+  modalCard: { backgroundColor: '#ffffff', width: '95%', maxWidth: '440px', maxHeight: '90dvh', overflowY: 'auto', borderRadius: '14px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)' },
+  modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' },
+  btnClose: { backgroundColor: '#e2e8f0', border: 'none', borderRadius: '6px', width: '30px', height: '30px', cursor: 'pointer', fontWeight: 'bold' },
+  modeSelectorRow: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' },
+  modeBtn: { padding: '8px', borderRadius: '8px', border: 'none', fontWeight: 'bold', fontSize: '0.8rem', cursor: 'pointer' },
+  quickPresetsRow: { display: 'flex', gap: '6px', flexWrap: 'wrap' },
+  presetBtn: { flex: 1, minWidth: '70px', padding: '8px 4px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', fontSize: '0.75rem', fontWeight: 'bold', color: '#334155', cursor: 'pointer' },
+  inputGroup: { display: 'flex', flexDirection: 'column', gap: '4px' },
+  inputLabel: { fontSize: '0.8rem', fontWeight: 'bold', color: '#475569' },
+  touchInput: { width: '100%', padding: '10px', fontSize: '1.2rem', fontWeight: 'bold', textAlign: 'center', borderRadius: '8px', border: '2px solid #0284c7', outline: 'none', boxSizing: 'border-box' },
+  subtotalDisplay: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: '8px', border: '1px solid #bbf7d0' },
+  btnAddCart: { width: '100%', padding: '12px', borderRadius: '8px', color: '#fff', fontWeight: 'bold', fontSize: '0.95rem', border: 'none' },
+  btnMethodCash: { padding: '14px', backgroundColor: '#15803d', color: '#fff', fontWeight: 'bold', fontSize: '1rem', borderRadius: '10px', border: 'none', cursor: 'pointer' },
+  btnMethodDigital: { padding: '14px', backgroundColor: '#0284c7', color: '#fff', fontWeight: 'bold', fontSize: '1rem', borderRadius: '10px', border: 'none', cursor: 'pointer' },
+  summaryBox: { display: 'flex', justifyContent: 'space-between', backgroundColor: '#f8fafc', padding: '10px', borderRadius: '8px', fontSize: '1rem', border: '1px solid #e2e8f0' }
 };
 
 export default NuevoCliente;

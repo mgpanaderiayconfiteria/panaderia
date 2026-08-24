@@ -13,14 +13,12 @@ const CajaHome = () => {
   const { user } = useContext(AuthContext);
   const { products, fetchProducts, addProduct } = useContext(ProductContext);
 
-  // Estados de Modales
   const [showCatalog, setShowCatalog] = useState(false);
   const [showCierreModal, setShowCierreModal] = useState(false);
   const [showAperturaModal, setShowAperturaModal] = useState(false);
   const [showWasteModal, setShowWasteModal] = useState(false);
   const [showQuickProdModal, setShowQuickProdModal] = useState(false);
 
-  // Estados de Gestión de Caja, Arqueo y Mermas
   const [initialCash, setInitialCash] = useState(localStorage.getItem('mg_initial_cash') || '0');
   const [tempCashInput, setTempCashInput] = useState('');
   const [actualCashInput, setActualCashInput] = useState('');
@@ -36,7 +34,6 @@ const CajaHome = () => {
     if (!savedCash) setShowAperturaModal(true);
   }, []);
 
-  // Cálculos de Arqueo
   const totalEfectivoVentas = sales
     ? sales.filter(s => (s.paymentMethod || 'efectivo') === 'efectivo').reduce((acc, s) => acc + (parseFloat(s.total) || 0), 0)
     : 0;
@@ -163,15 +160,14 @@ const CajaHome = () => {
 
   return (
     <div className="caja-container">
-      {/* Reglas CSS Responsivas */}
       <style>{`
         .caja-container {
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: flex-start;
-          min-height: 100vh;
-          padding: 15px;
+          min-height: 100dvh;
+          padding: 12px;
           box-sizing: border-box;
           background-color: #f8fafc;
         }
@@ -179,33 +175,32 @@ const CajaHome = () => {
         .top-info-bar {
           display: flex;
           flex-wrap: wrap;
-          gap: 10px 20px;
+          gap: 8px 16px;
           align-items: center;
           justify-content: center;
           background-color: #ffffff;
-          padding: 10px 18px;
-          border-radius: 30px;
+          padding: 8px 14px;
+          border-radius: 20px;
           border: 1px solid #cbd5e1;
-          font-size: 0.9rem;
+          font-size: 0.85rem;
           color: #334155;
           box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-          margin-bottom: 20px;
+          margin-bottom: 16px;
           width: 100%;
           max-width: 800px;
+          box-sizing: border-box;
         }
 
-        /* GRID RESPONSIVA DE BOTONES */
         .buttons-grid {
           display: grid;
           grid-template-columns: repeat(2, 1fr);
-          gap: 16px;
+          gap: 12px;
           width: 100%;
           max-width: 800px;
           justify-items: center;
           align-items: center;
         }
 
-        /* iPad Vertical / Móvil Horizontal */
         @media (min-width: 600px) {
           .buttons-grid {
             grid-template-columns: repeat(3, 1fr);
@@ -213,31 +208,22 @@ const CajaHome = () => {
           }
         }
 
-        /* iPad Horizontal / Pantallas Grandes */
-        @media (min-width: 900px) {
-          .buttons-grid {
-            grid-template-columns: repeat(3, 1fr);
-            gap: 25px;
-          }
-        }
-
-        /* ESTILO CIRCULAR Y RESPONSIVO PARA BOTONES */
         .btn-circle {
           width: 100%;
-          max-width: 140px;
+          max-width: 120px;
           aspect-ratio: 1 / 1;
           border-radius: 50%;
           border: none;
           color: #ffffff;
           font-weight: bold;
-          font-size: clamp(0.85rem, 2.5vw, 1.05rem);
+          font-size: clamp(0.75rem, 2.8vw, 1rem);
           cursor: pointer;
-          box-shadow: 0px 6px 14px rgba(0,0,0,0.12);
+          box-shadow: 0px 4px 10px rgba(0,0,0,0.12);
           display: flex;
           align-items: center;
           justify-content: center;
           text-align: center;
-          padding: 12px;
+          padding: 8px;
           transition: transform 0.2s ease, box-shadow 0.2s ease;
           user-select: none;
         }
@@ -253,26 +239,26 @@ const CajaHome = () => {
         .btn-yellow { background-color: #d97706; }
         .btn-red { background-color: #c62828; }
 
-        /* ESTILOS DE MODALES ADAPTABLES */
         .modal-card {
           background-color: #ffffff;
-          width: 92%;
+          width: 95%;
           max-width: 440px;
-          max-height: 90vh;
+          max-height: 90dvh;
           overflow-y: auto;
           border-radius: 16px;
-          padding: 20px;
+          padding: 16px;
           display: flex;
           flex-direction: column;
           gap: 12px;
           box-shadow: 0 20px 25px -5px rgba(0,0,0,0.25);
+          box-sizing: border-box;
         }
 
         .modal-content-large {
           background-color: #f8fafc;
           width: 95%;
           max-width: 1100px;
-          height: 90vh;
+          height: 90dvh;
           border-radius: 16px;
           display: flex;
           flex-direction: column;
@@ -288,7 +274,7 @@ const CajaHome = () => {
         <button onClick={() => setShowAperturaModal(true)} style={styles.btnLinkEdit}>Ajustar Fondo</button>
       </div>
 
-      {/* BOTONES PRINCIPALES EN MODO CIRCULAR Y RESPONSIVO */}
+      {/* BOTONES PRINCIPALES */}
       <div className="buttons-grid">
         <button className="btn-circle btn-green" onClick={() => navigate('/nuevo-cliente')}>
           + Nuevo cliente
@@ -315,12 +301,12 @@ const CajaHome = () => {
         </button>
       </div>
 
-      {/* MODAL APERTURA DE CAJA / FONDO INICIAL */}
+      {/* MODAL APERTURA DE CAJA */}
       {showAperturaModal && (
         <div style={styles.modalOverlay}>
           <div className="modal-card">
             <div style={styles.modalHeader}>
-              <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#0f172a' }}>💵 APERTURA DE CAJA</h3>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>💵 APERTURA DE CAJA</h3>
             </div>
             <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>
               Ingrese el monto en efectivo disponible en la caja al iniciar el turno.
@@ -345,7 +331,7 @@ const CajaHome = () => {
         <div style={styles.modalOverlay}>
           <div className="modal-content-large">
             <div style={styles.modalHeader}>
-              <h2 style={{ margin: 0, fontSize: '1.2rem', color: '#0f172a' }}>CONSULTA DE STOCK Y PRECIOS</h2>
+              <h2 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>CONSULTA DE STOCK Y PRECIOS</h2>
               <button onClick={() => setShowCatalog(false)} style={styles.btnCloseModal}>✕ Cerrar</button>
             </div>
             <div style={styles.modalBody}><StockCatalog /></div>
@@ -465,16 +451,16 @@ const CajaHome = () => {
         </div>
       )}
 
-      {/* MODAL CIERRE DE TURNO Y ARQUEO COMPLETO */}
+      {/* MODAL CIERRE DE TURNO */}
       {showCierreModal && (
         <div style={styles.modalOverlay}>
           <div className="modal-card">
             <div style={styles.modalHeader}>
-              <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#0f172a' }}>🔒 ARQUEO Y CIERRE DE TURNO</h3>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>🔒 ARQUEO Y CIERRE DE TURNO</h3>
               <button onClick={() => setShowCierreModal(false)} style={styles.btnCloseModal}>✕</button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: '10px 0' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: '8px 0' }}>
               <div style={styles.resumenRow}>
                 <span>Ventas Totales:</span>
                 <strong>{sales ? sales.length : 0} órdenes</strong>
@@ -494,12 +480,12 @@ const CajaHome = () => {
 
               <hr style={{ border: 'none', borderTop: '1px solid #cbd5e1', margin: '4px 0' }} />
 
-              <div style={{ ...styles.resumenRow, backgroundColor: '#f0fdf4', padding: '8px', borderRadius: '6px' }}>
+              <div style={{ ...styles.resumenRow, backgroundColor: '#f0fdf4', padding: '6px 8px', borderRadius: '6px' }}>
                 <span style={{ fontWeight: 'bold', color: '#166534' }}>EFECTIVO ESPERADO EN CAJA:</span>
-                <strong style={{ fontSize: '1.1rem', color: '#166534' }}>${efectivoEsperadoEnCaja.toFixed(2)}</strong>
+                <strong style={{ fontSize: '1rem', color: '#166534' }}>${efectivoEsperadoEnCaja.toFixed(2)}</strong>
               </div>
 
-              <div style={{ marginTop: '8px' }}>
+              <div style={{ marginTop: '6px' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#334155', display: 'block', marginBottom: '4px' }}>
                   💵 Efectivo Real Contado en Caja ($):
                 </label>
@@ -508,15 +494,15 @@ const CajaHome = () => {
                   placeholder="Ej. 12500"
                   value={actualCashInput}
                   onChange={(e) => setActualCashInput(e.target.value)}
-                  style={{ ...styles.inputForm, border: '2px solid #0284c7', fontSize: '1.05rem', fontWeight: 'bold' }}
+                  style={{ ...styles.inputForm, border: '2px solid #0284c7', fontSize: '1rem', fontWeight: 'bold' }}
                 />
               </div>
 
               {actualCashInput !== '' && (
                 <div style={{
-                  padding: '8px',
+                  padding: '6px 8px',
                   borderRadius: '6px',
-                  fontSize: '0.85rem',
+                  fontSize: '0.8rem',
                   fontWeight: 'bold',
                   textAlign: 'center',
                   backgroundColor: diferenciaCaja === 0 ? '#f0fdf4' : diferenciaCaja > 0 ? '#eff6ff' : '#fef2f2',
@@ -542,16 +528,16 @@ const CajaHome = () => {
 
 const styles = {
   btnLinkEdit: { background: 'none', border: 'none', color: '#0284c7', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.8rem', padding: 0 },
-  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.65)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '15px' },
-  modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '8px', borderBottom: '1px solid #e2e8f0' },
-  btnCloseModal: { backgroundColor: '#e2e8f0', color: '#334155', border: 'none', padding: '6px 12px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem' },
-  modalBody: { padding: '15px', overflowY: 'auto', flex: 1 },
-  resumenRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.9rem', color: '#334155' },
-  inputForm: { padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.95rem', width: '100%', boxSizing: 'border-box' },
-  btnConfirmarVerde: { width: '100%', padding: '12px', backgroundColor: '#15803d', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.95rem', cursor: 'pointer' },
-  btnConfirmarRojo: { width: '100%', padding: '12px', backgroundColor: '#dc2626', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.95rem', cursor: 'pointer' },
-  btnConfirmarAzul: { width: '100%', padding: '12px', backgroundColor: '#0284c7', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.95rem', cursor: 'pointer' },
-  btnConfirmarCierre: { width: '100%', padding: '14px', backgroundColor: '#c62828', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer' }
+  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.65)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '12px' },
+  modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '6px', borderBottom: '1px solid #e2e8f0' },
+  btnCloseModal: { backgroundColor: '#e2e8f0', color: '#334155', border: 'none', padding: '6px 10px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.8rem' },
+  modalBody: { padding: '10px', overflowY: 'auto', flex: 1 },
+  resumenRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem', color: '#334155' },
+  inputForm: { padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem', width: '100%', boxSizing: 'border-box' },
+  btnConfirmarVerde: { width: '100%', padding: '10px', backgroundColor: '#15803d', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.9rem', cursor: 'pointer' },
+  btnConfirmarRojo: { width: '100%', padding: '10px', backgroundColor: '#dc2626', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.9rem', cursor: 'pointer' },
+  btnConfirmarAzul: { width: '100%', padding: '10px', backgroundColor: '#0284c7', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.9rem', cursor: 'pointer' },
+  btnConfirmarCierre: { width: '100%', padding: '12px', backgroundColor: '#c62828', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.95rem', cursor: 'pointer' }
 };
 
 export default CajaHome;
