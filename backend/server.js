@@ -5,6 +5,22 @@ require('dotenv').config();
 
 const User = require('./models/User');
 
+// Importaciones directas de rutas
+const authRoutes = require('./routes/authRoutes');
+const userRoutes = require('./routes/userRoutes');
+const productRoutes = require('./routes/productRoutes');
+
+let orderRoutes;
+try {
+  orderRoutes = require('./routes/orderRoutes');
+} catch (e) {
+  try {
+    orderRoutes = require('./routes/orders');
+  } catch (err) {
+    console.warn('⚠️ No se encontró el archivo de rutas para órdenes (/routes/orderRoutes o /routes/orders)');
+  }
+}
+
 const app = express();
 
 // 1. Configuración de CORS
@@ -31,7 +47,7 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Middleware Logger para registrar cada petición en los logs de Render
+// Middleware Logger
 app.use((req, res, next) => {
   const start = Date.now();
   const { method, originalUrl } = req;
@@ -49,20 +65,13 @@ app.use((req, res, next) => {
   next();
 });
 
-// Rutas de la API
-app.use('/api/auth', require('./routes/authRoutes'));
-app.use('/api/users', require('./routes/userRoutes'));
-app.use('/api/products', require('./routes/productRoutes'));
+// Rutas de la API seguras
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/products', productRoutes);
 
-// Carga e interconexión dinámica de las rutas de ventas/órdenes
-try {
-  app.use('/api/orders', require('./routes/orderRoutes'));
-} catch (e) {
-  try {
-    app.use('/api/orders', require('./routes/orders'));
-  } catch (err) {
-    console.warn('⚠️ No se encontró el archivo de rutas para órdenes (/routes/orderRoutes o /routes/orders)');
-  }
+if (orderRoutes) {
+  app.use('/api/orders', orderRoutes);
 }
 
 // Función para inicializar la cuenta Admin
@@ -112,7 +121,7 @@ app.get('/', (req, res) => {
   res.send('API de Panadería funcionando 🚀');
 });
 
-// Capturador de rutas 404 (evita responder con HTML cuando falla una ruta API)
+// Capturador de rutas 404
 app.use((req, res, next) => {
   console.warn(`⚠️ [404] Ruta no encontrada: ${req.originalUrl}`);
   res.status(404).json({ message: `La ruta ${req.originalUrl} no existe en el servidor` });
