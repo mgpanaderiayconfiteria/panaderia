@@ -55,18 +55,11 @@ app.use((req, res, next) => {
   next();
 });
 
-// Vinculación segura de rutas
-if (typeof authRoutes === 'function') app.use('/api/auth', authRoutes);
-else console.warn('⚠️ authRoutes no exporta un router válido');
-
-if (typeof userRoutes === 'function') app.use('/api/users', userRoutes);
-else console.warn('⚠️ userRoutes no exporta un router válido');
-
-if (typeof productRoutes === 'function') app.use('/api/products', productRoutes);
-else console.warn('⚠️ productRoutes no exporta un router válido');
-
-if (typeof orderRoutes === 'function') app.use('/api/orders', orderRoutes);
-else console.warn('⚠️ orderRoutes no exporta un router válido');
+// Enrutamiento directo de la API
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/orders', orderRoutes);
 
 // Función para inicializar la cuenta Admin
 const initAdmin = async () => {

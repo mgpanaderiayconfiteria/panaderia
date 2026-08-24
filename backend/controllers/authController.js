@@ -1,88 +1,108 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 
+// Función para generar JWT Token
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET || 'secretkey_mgpanaderia_2026', { expiresIn: '30d' });
+  return jwt.sign({ id }, process.env.JWT_SECRET || 'secretopanes123', {
+    expiresIn: '30d',
+  });
 };
 
-exports.registerUser = async (req, res) => {
-  const { name, username, email, password, role } = req.body;
+// @desc    Autenticar usuario & obtener token
+// @route   POST /api/auth/login
+// @access  Public
+const loginUser = async (req, res) => {
   try {
-    const cleanUsername = username ? username.trim().toLowerCase() : null;
-    const cleanEmail = email ? email.trim().toLowerCase() : `${cleanUsername}@panaderia.local`;
+    const { email, password } = req.body;
 
-    const userExists = await User.findOne({
-      $or: [
-        { email: cleanEmail },
-        ...(cleanUsername ? [{ username: cleanUsername }] : [])
-      ]
-    });
-
-    if (userExists) return res.status(400).json({ message: 'El usuario ya existe' });
-
-    const user = await User.create({
-      name: name ? name.trim() : '',
-      username: cleanUsername,
-      email: cleanEmail,
-      password,
-      role: role || 'cajero',
-      isAdmin: role === 'admin'
-    });
-
-    res.status(201).json({
-      _id: user._id,
-      name: user.name,
-      username: user.username,
-      email: user.email,
-      role: user.role,
-      isAdmin: user.isAdmin,
-      token: generateToken(user._id)
-    });
-  } catch (error) {
-    console.error('Error en registerUser:', error);
-    res.status(500).json({ message: 'Error al registrar usuario', error: error.message });
-  }
-};
-
-exports.loginUser = async (req, res) => {
-  const { loginInput, email, username, password } = req.body;
-  try {
-    // Permite recibir la identificación mediante el campo genérico loginInput, email o username
-    const identifier = (loginInput || username || email || '').trim().toLowerCase();
-
-    if (!identifier || !password) {
-      return res.status(400).json({ message: 'Por favor ingresá usuario/email y contraseña' });
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Por favor complete todos los campos' });
     }
 
-    // Busca por coincidencia exacta en el campo username o en email
+    const cleanInput = email.trim().toLowerCase();
+
+    // Busca por email O por username trayendo la contraseña (+password)
     const user = await User.findOne({
-      $or: [
-        { username: identifier },
-        { email: identifier }
-      ]
+      $or: [{ email: cleanInput }, { username: cleanInput }]
     }).select('+password');
 
     if (!user) {
-      return res.status(401).json({ message: 'Usuario no encontrado' });
+      return res.status(401).json({ message: 'Usuario o contraseña incorrectos' });
     }
 
+    // Compara la contraseña usando el método del esquema
     const isMatch = await user.matchPassword(password);
 
     if (isMatch) {
-      return res.json({
+      res.json({
         _id: user._id,
         name: user.name,
-        username: user.username,
         email: user.email,
-        role: user.role,
+        username: user.username,
+        role: user.role || 'cajero',
         isAdmin: user.isAdmin || user.role === 'admin',
         token: generateToken(user._id)
       });
     } else {
-      return res.status(401).json({ message: 'Credenciales inválidas' });
+      res.status(401).json({ message: 'Usuario o contraseña incorrectos' });
     }
   } catch (error) {
     console.error('Error en loginUser:', error);
     res.status(500).json({ message: 'Error interno en el servidor', error: error.message });
   }
+};
+
+// @desc    Registrar nuevo usuario
+// @route   POST /api/auth/register
+// @access  Public / Admin
+const registerUser = async (req, res) => {
+  try {
+    const { name, email, username, password, role, isAdmin } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: 'Por favor complete los campos obligatorios' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanUsername = username ? username.trim().toLowerCase() : undefined;
+
+    const userExists = await User.findOne({
+      $or: [{ email: cleanEmail }, ...(cleanUsername ? [{ username: cleanUsername }] : [])]
+    });
+
+    if (userExists) {
+      return res.status(400).json({ message: 'El usuario o email ya se encuentra registrado' });
+    }
+
+    const user = await User.create({
+      name,
+      email: cleanEmail,
+      username: cleanUsername,
+      password,
+      role: role || 'cajero',
+      isAdmin: isAdmin || role === 'admin'
+    });
+
+    if (user) {
+      res.status(201).json({
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        username: user.username,
+        role: user.role,
+        isAdmin: user.isAdmin,
+        token: generateToken(user._id)
+      });
+    } else {
+      res.status(400).json({ message: 'Datos de usuario inválidos' });
+    }
+  } catch (error) {
+    console.error('Error en registerUser:', error);
+    res.status(500).json({ message: 'Error interno al registrar usuario', error: error.message });
+  }
+};
+
+module.exports = {
+  loginUser,
+  registerUser
 };

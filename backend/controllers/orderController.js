@@ -1,35 +1,46 @@
 const Order = require('../models/Order');
 
-// Crear nueva venta desde el POS
-exports.createOrder = async (req, res) => {
+// @desc    Crear un nuevo pedido
+// @route   POST /api/orders
+// @access  Private
+const createOrder = async (req, res) => {
   try {
-    const { items, subtotal, discount, total, paidAmount, changeAmount, paymentMethod } = req.body;
+    const { items, total, paymentMethod, customerName } = req.body;
 
-    const newOrder = new Order({
+    if (!items || items.length === 0) {
+      return res.status(400).json({ message: 'No hay productos en la orden' });
+    }
+
+    const order = new Order({
+      user: req.user ? req.user._id : null,
       items,
-      subtotal,
-      discount: discount || 0,
       total,
-      paidAmount,
-      changeAmount,
-      paymentMethod,
-      seller: req.user?._id, // Viene del middleware de autenticación (JWT)
-      employee: req.user?.name || 'Empleado Caja'
+      paymentMethod: paymentMethod || 'efectivo',
+      customerName: customerName || 'Cliente General'
     });
 
-    const savedOrder = await newOrder.save();
-    res.status(201).json(savedOrder);
+    const createdOrder = await order.save();
+    res.status(201).json(createdOrder);
   } catch (error) {
-    res.status(500).json({ message: 'Error al registrar la venta', error: error.message });
+    console.error('Error al crear orden:', error);
+    res.status(500).json({ message: 'Error interno al procesar el pedido', error: error.message });
   }
 };
 
-// Obtener todas las ventas (Para Panel Admin)
-exports.getOrders = async (req, res) => {
+// @desc    Obtener todas las órdenes
+// @route   GET /api/orders
+// @access  Private
+const getOrders = async (req, res) => {
   try {
-    const orders = await Order.find().populate('seller', 'name email role').sort({ createdAt: -1 });
-    res.status(200).json(orders);
+    const orders = await Order.find({}).sort({ createdAt: -1 });
+    res.json(orders);
   } catch (error) {
-    res.status(500).json({ message: 'Error al obtener las ventas', error: error.message });
+    console.error('Error al obtener órdenes:', error);
+    res.status(500).json({ message: 'Error interno al consultar pedidos', error: error.message });
   }
+};
+
+module.exports = {
+  createOrder,
+  getOrders
 };
