@@ -3,6 +3,7 @@ import { ProductContext } from '../context/ProductContext';
 import { SaleContext } from '../context/SaleContext';
 import UsersManager from '../components/UsersManager';
 import ProductsManager from '../components/ProductsManager';
+import AnalyticsModal from '../components/AnalyticsModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -11,6 +12,7 @@ const AdminPanel = () => {
   const { sales } = useContext(SaleContext);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [wasteLogs, setWasteLogs] = useState([]);
+  const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
 
   // Estado para filtrado por fecha específica
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -134,6 +136,14 @@ const AdminPanel = () => {
 
   return (
     <div style={styles.dashboardContainer}>
+      {/* MODAL DE GRÁFICOS Y ANALÍTICA */}
+      <AnalyticsModal 
+        isOpen={showAnalyticsModal}
+        onClose={() => setShowAnalyticsModal(false)}
+        sales={filteredSales}
+        products={products}
+      />
+
       <nav style={styles.topNav}>
         <div style={styles.navLeft}>
           <div style={styles.logoBadge}>MG</div>
@@ -163,6 +173,12 @@ const AdminPanel = () => {
           </span>
         </div>
         <div style={styles.navRight}>
+          <button 
+            onClick={() => setShowAnalyticsModal(true)} 
+            style={styles.btnAnalytics}
+          >
+            📈 Gráficos & Analytics
+          </button>
           <div style={styles.userProfile}>
             <div style={styles.avatar}>MG</div>
             <span>Administrador ▾</span>
@@ -432,7 +448,8 @@ const styles = {
   logoBadge: { backgroundColor: '#1b4332', width: '28px', height: '28px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '0.8rem' },
   navLink: { fontSize: '0.85rem', color: '#94a3b8', cursor: 'pointer' },
   navLinkActive: { color: '#ffffff', backgroundColor: '#1e3a5f', padding: '6px 12px', borderRadius: '4px' },
-  navRight: { display: 'flex', alignItems: 'center' },
+  navRight: { display: 'flex', alignItems: 'center', gap: '15px' },
+  btnAnalytics: { backgroundColor: '#9333ea', color: '#ffffff', border: 'none', padding: '6px 14px', borderRadius: '6px', fontWeight: 'bold', fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', transition: 'background-color 0.2s' },
   userProfile: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' },
   avatar: { width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#cbd5e1', color: '#0f2337', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 'bold' },
   mainContent: { padding: '20px' },
