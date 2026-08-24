@@ -41,13 +41,13 @@ export const SaleProvider = ({ children }) => {
   const addSale = async (saleData) => {
     const payload = {
       items: saleData.items || [],
-      subtotal: saleData.subtotal || 0,
+      subtotal: saleData.subtotal || saleData.total || 0,
       discount: saleData.discount || 0,
       total: saleData.total || 0,
       paidAmount: saleData.paidAmount || saleData.total || 0,
       changeAmount: saleData.changeAmount || 0,
       paymentMethod: saleData.paymentMethod || 'efectivo',
-      seller: saleData.sellerId !== 'N/A' ? saleData.sellerId : undefined,
+      seller: saleData.sellerId && saleData.sellerId.length === 24 ? saleData.sellerId : undefined,
       employee: saleData.sellerName || saleData.cashier || 'Empleado Caja',
       status: saleData.status || 'completed'
     };
@@ -70,10 +70,11 @@ export const SaleProvider = ({ children }) => {
         setSales((prevSales) => [createdOrder, ...prevSales]);
         return createdOrder;
       } else {
-        throw new Error('Error en el servidor al registrar la orden');
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(errJson.message || 'Error en el servidor al registrar la orden');
       }
     } catch (error) {
-      console.warn('Conexión con servidor fallida, guardando en modo contingencia local:', error);
+      console.warn('Conexión con servidor fallida o rechazada. Guardando en modo contingencia local:', error);
       
       const fallbackSale = {
         _id: `SALE-LOCAL-${Date.now()}`,
@@ -83,10 +84,11 @@ export const SaleProvider = ({ children }) => {
         dateStr: new Date().toLocaleDateString('es-AR'),
         timeStr: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
         sellerName: saleData.sellerName || saleData.cashier || 'Cajero Desconocido',
+        cashier: saleData.sellerName || saleData.cashier || 'Cajero Desconocido',
         sellerRole: saleData.sellerRole || 'cajero',
         items: saleData.items || [],
         paymentMethod: saleData.paymentMethod || 'efectivo',
-        subtotal: saleData.subtotal || 0,
+        subtotal: saleData.subtotal || saleData.total || 0,
         discount: saleData.discount || 0,
         total: saleData.total || 0,
         paidAmount: saleData.paidAmount || saleData.total || 0,

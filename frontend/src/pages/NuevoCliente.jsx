@@ -16,12 +16,12 @@ const NuevoCliente = () => {
   
   // Estados de Carrito y Pop-ups
   const [cart, setCart] = useState([]);
-  const [sellMode, setSellMode] = useState('weight');
+  const [sellMode, setSellMode] = useState('weight'); // 'weight' | 'unit' | 'portion' | 'amount'
   const [quantity, setQuantity] = useState('');
   
   // Estados del Modal de Cobro
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
-  const [paymentStep, setPaymentStep] = useState('select_method'); // 'select_method' | 'cash_details' | 'digital_standby'
+  const [paymentStep, setPaymentStep] = useState('select_method');
   const [cashGiven, setCashGiven] = useState('');
 
   const categoryProducts = useMemo(() => {
@@ -30,19 +30,25 @@ const NuevoCliente = () => {
 
   const handleSelectProduct = (product) => {
     setSelectedProduct(product);
+    // Establecer modalidad inicial según datos o por defecto a 'weight' o 'unit'
     if (product.allowByWeight) setSellMode('weight');
     else if (product.allowByUnit) setSellMode('unit');
-    else if (product.allowByPorcion) setSellMode('portion');
+    else if (product.allowByPorcion || product.allowByPortion) setSellMode('portion');
     else if (product.allowByAmount) setSellMode('amount');
+    else setSellMode('weight');
     setQuantity('');
   };
 
   const calculatedSubtotal = useMemo(() => {
     if (!selectedProduct || !quantity || isNaN(parseFloat(quantity))) return 0;
     const val = parseFloat(quantity);
-    if (sellMode === 'unit') return val * parseFloat(selectedProduct.priceUnit || selectedProduct.price || 0);
-    if (sellMode === 'weight') return (val / 1000) * parseFloat(selectedProduct.priceKg || 0);
-    if (sellMode === 'portion') return val * parseFloat(selectedProduct.pricePorcion || 0);
+    
+    // Buscar el precio base disponible en el producto
+    const basePrice = parseFloat(selectedProduct.price || selectedProduct.priceUnit || selectedProduct.priceKg || 0);
+
+    if (sellMode === 'unit') return val * parseFloat(selectedProduct.priceUnit || basePrice);
+    if (sellMode === 'weight') return (val / 1000) * parseFloat(selectedProduct.priceKg || basePrice);
+    if (sellMode === 'portion') return val * parseFloat(selectedProduct.pricePorcion || selectedProduct.pricePortion || basePrice);
     if (sellMode === 'amount') return val;
     return 0;
   }, [selectedProduct, sellMode, quantity]);
@@ -63,7 +69,7 @@ const NuevoCliente = () => {
       category: selectedProduct.category || 'Panadería',
       mode: sellMode,
       quantityVal: val,
-      unitPrice: calculatedSubtotal / val,
+      unitPrice: calculatedSubtotal / (val || 1),
       detailLabel,
       subtotal: calculatedSubtotal
     };
@@ -81,16 +87,16 @@ const NuevoCliente = () => {
     return given >= totalCart ? given - totalCart : 0;
   }, [cashGiven, totalCart]);
 
-  // Finalizar la compra y registrar en el SaleContext asociando al cajero activo
-  const handleConfirmCashSale = () => {
+  // Finalizar la compra y registrar en MongoDB a través del SaleContext
+  const handleConfirmCashSale = async () => {
     const given = parseFloat(cashGiven) || 0;
     if (given < totalCart) return;
 
-    addSale({
-      sellerId: user?._id || user?.id || 'USR-CAJA',
+    await addSale({
+      sellerId: user?._id || user?.id,
       sellerName: user?.name || user?.email || 'Empleado Caja',
       sellerRole: user?.role || 'cajero',
-      cashier: user?.name || 'Empleado Caja',
+      cashier: user?.name || user?.email || 'Empleado Caja',
       items: cart,
       paymentMethod: 'efectivo',
       subtotal: totalCart,
@@ -99,7 +105,7 @@ const NuevoCliente = () => {
       changeAmount: changeAmount
     });
 
-    // Resetear estados y volver a la caja
+    // Resetear estados y volver a la pantalla de CajaHome
     setShowCheckoutModal(false);
     setCart([]);
     setCashGiven('');
@@ -110,7 +116,7 @@ const NuevoCliente = () => {
   return (
     <div style={styles.container}>
       
-      {/* TABLERO POS (Estilo McDonald's) */}
+      {/* TABLERO POS */}
       <div style={styles.posPanel}>
         <div style={styles.categoryBar}>
           {categories.map((cat) => (
@@ -183,7 +189,7 @@ const NuevoCliente = () => {
         </div>
       </div>
 
-      {/* POP-UP SELECCIÓN DE CANTIDAD/PESO */}
+      {/* POP-UP SELECCIÓN DE CANTIDAD/PESO (Con las 4 modalidades habilitadas para todos los productos) */}
       {selectedProduct && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalCard}>
@@ -191,12 +197,15 @@ const NuevoCliente = () => {
               <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#0f172a' }}>{selectedProduct.name}</h3>
               <button onClick={() => setSelectedProduct(null)} style={styles.btnClose}>✕</button>
             </div>
+            
+            {/* Opciones de venta disponibles siempre para que el vendedor elija */}
             <div style={styles.modeSelectorRow}>
-              {selectedProduct.allowByWeight && <button onClick={() => { setSellMode('weight'); setQuantity(''); }} style={{ ...styles.modeBtn, backgroundColor: sellMode === 'weight' ? '#0284c7' : '#e2e8f0', color: sellMode === 'weight' ? '#fff' : '#334155' }}>⚖️ Pesado (Gramos)</button>}
-              {selectedProduct.allowByUnit && <button onClick={() => { setSellMode('unit'); setQuantity(''); }} style={{ ...styles.modeBtn, backgroundColor: sellMode === 'unit' ? '#0284c7' : '#e2e8f0', color: sellMode === 'unit' ? '#fff' : '#334155' }}>🔢 Unidades</button>}
-              {selectedProduct.allowByPorcion && <button onClick={() => { setSellMode('portion'); setQuantity(''); }} style={{ ...styles.modeBtn, backgroundColor: sellMode === 'portion' ? '#0284c7' : '#e2e8f0', color: sellMode === 'portion' ? '#fff' : '#334155' }}>🍰 Porciones</button>}
-              {selectedProduct.allowByAmount && <button onClick={() => { setSellMode('amount'); setQuantity(''); }} style={{ ...styles.modeBtn, backgroundColor: sellMode === 'amount' ? '#0284c7' : '#e2e8f0', color: sellMode === 'amount' ? '#fff' : '#334155' }}>💵 Monto $</button>}
+              <button onClick={() => { setSellMode('weight'); setQuantity(''); }} style={{ ...styles.modeBtn, backgroundColor: sellMode === 'weight' ? '#0284c7' : '#e2e8f0', color: sellMode === 'weight' ? '#fff' : '#334155' }}>⚖️ Pesado (Gramos)</button>
+              <button onClick={() => { setSellMode('unit'); setQuantity(''); }} style={{ ...styles.modeBtn, backgroundColor: sellMode === 'unit' ? '#0284c7' : '#e2e8f0', color: sellMode === 'unit' ? '#fff' : '#334155' }}>🔢 Unidades</button>
+              <button onClick={() => { setSellMode('portion'); setQuantity(''); }} style={{ ...styles.modeBtn, backgroundColor: sellMode === 'portion' ? '#0284c7' : '#e2e8f0', color: sellMode === 'portion' ? '#fff' : '#334155' }}>🍰 Porciones</button>
+              <button onClick={() => { setSellMode('amount'); setQuantity(''); }} style={{ ...styles.modeBtn, backgroundColor: sellMode === 'amount' ? '#0284c7' : '#e2e8f0', color: sellMode === 'amount' ? '#fff' : '#334155' }}>💵 Monto $</button>
             </div>
+
             <div style={styles.quickPresetsRow}>
               {sellMode === 'weight' && (
                 <>
@@ -214,6 +223,7 @@ const NuevoCliente = () => {
                 </>
               )}
             </div>
+
             <div style={styles.inputGroup}>
               <label style={styles.inputLabel}>
                 {sellMode === 'weight' && 'Ingrese gramos (ej: 250):'}
@@ -223,16 +233,18 @@ const NuevoCliente = () => {
               </label>
               <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="0" autoFocus style={styles.touchInput} />
             </div>
+
             <div style={styles.subtotalDisplay}>
               <span>Subtotal:</span>
               <strong style={{ fontSize: '1.4rem', color: '#166534' }}>${calculatedSubtotal.toFixed(2)}</strong>
             </div>
+
             <button onClick={handleAddToCart} disabled={calculatedSubtotal <= 0} style={{ ...styles.btnAddCart, backgroundColor: calculatedSubtotal <= 0 ? '#cbd5e1' : '#1b4332', cursor: calculatedSubtotal <= 0 ? 'not-allowed' : 'pointer' }}>➕ AGREGAR AL PEDIDO</button>
           </div>
         </div>
       )}
 
-      {/* MODAL DE COBRO (EFECTIVO / DIGITAL) */}
+      {/* MODAL DE COBRO */}
       {showCheckoutModal && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalCard}>
@@ -242,7 +254,6 @@ const NuevoCliente = () => {
               <button onClick={() => setShowCheckoutModal(false)} style={styles.btnClose}>✕</button>
             </div>
 
-            {/* SELECCIÓN DE MÉTODO DE PAGO */}
             {paymentStep === 'select_method' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div style={{ textAlign: 'center', margin: '10px 0' }}>
@@ -260,7 +271,6 @@ const NuevoCliente = () => {
               </div>
             )}
 
-            {/* DETALLE PAGO EN EFECTIVO Y VUELTO */}
             {paymentStep === 'cash_details' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div style={styles.summaryBox}>
@@ -280,7 +290,6 @@ const NuevoCliente = () => {
                   />
                 </div>
 
-                {/* Acceso Rápido de Paga Con */}
                 <div style={styles.quickPresetsRow}>
                   <button onClick={() => setCashGiven(totalCart.toString())} style={styles.presetBtn}>Monto Exacto</button>
                   <button onClick={() => setCashGiven('1000')} style={styles.presetBtn}>$1.000</button>
@@ -289,7 +298,6 @@ const NuevoCliente = () => {
                   <button onClick={() => setCashGiven('10000')} style={styles.presetBtn}>$10.000</button>
                 </div>
 
-                {/* Display del Vuelto */}
                 <div style={{ ...styles.subtotalDisplay, backgroundColor: (parseFloat(cashGiven) || 0) < totalCart ? '#fef2f2' : '#f0fdf4' }}>
                   <span style={{ fontSize: '1.1rem' }}>VUELTO:</span>
                   <strong style={{ fontSize: '1.8rem', color: (parseFloat(cashGiven) || 0) < totalCart ? '#dc2626' : '#166534' }}>
@@ -317,7 +325,6 @@ const NuevoCliente = () => {
               </div>
             )}
 
-            {/* STANDBY PAGO DIGITAL */}
             {paymentStep === 'digital_standby' && (
               <div style={{ textAlign: 'center', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div style={{ fontSize: '3rem' }}>⌛</div>
