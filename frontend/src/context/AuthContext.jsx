@@ -32,9 +32,10 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('mg_user', JSON.stringify(data));
       return { success: true, user: data };
     } catch (error) {
-      // Validación fallback con credenciales acordadas
+      // Fallback local: Administrador
       if (email === 'mgpanaderiayconfiteria@gmail.com' && password === 'pana80y2') {
         const adminUser = {
+          _id: 'USR-ADMIN',
           email,
           name: 'MG Administrador',
           role: 'admin',
@@ -43,6 +44,20 @@ export const AuthProvider = ({ children }) => {
         setUser(adminUser);
         localStorage.setItem('mg_user', JSON.stringify(adminUser));
         return { success: true, user: adminUser };
+      }
+
+      // Fallback local: Cajero / Empleado de prueba
+      if (email === 'caja@mgpanaderia.com' && password === 'caja123') {
+        const cajeroUser = {
+          _id: 'USR-CAJA1',
+          email,
+          name: 'Empleado Caja',
+          role: 'cajero',
+          isAdmin: false
+        };
+        setUser(cajeroUser);
+        localStorage.setItem('mg_user', JSON.stringify(cajeroUser));
+        return { success: true, user: cajeroUser };
       }
 
       return { success: false, message: error.message || 'Credenciales incorrectas' };
@@ -56,6 +71,7 @@ export const AuthProvider = ({ children }) => {
 
   const value = {
     user,
+    currentUser: user, // Alias para compatibilidad con el resto del sistema
     loading,
     login,
     logout,
