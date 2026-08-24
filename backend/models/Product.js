@@ -37,6 +37,16 @@ const productSchema = new mongoose.Schema({
     default: 0,
     min: 0
   },
+  priceHalfDozen: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  priceDozen: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
   priceKg: {
     type: Number,
     default: 0,

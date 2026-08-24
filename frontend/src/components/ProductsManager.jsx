@@ -9,6 +9,8 @@ const INITIAL_FORM = {
   allowByPorcion: false,
   allowByAmount: false,
   priceUnit: '',
+  priceHalfDozen: '',
+  priceDozen: '',
   priceKg: '',
   pricePorcion: '',
   cogs: '',
@@ -71,6 +73,8 @@ const ProductsManager = () => {
     const payload = {
       ...formData,
       priceUnit: parseFloat(formData.priceUnit || 0),
+      priceHalfDozen: parseFloat(formData.priceHalfDozen || 0),
+      priceDozen: parseFloat(formData.priceDozen || 0),
       priceKg: parseFloat(formData.priceKg || 0),
       pricePorcion: parseFloat(formData.pricePorcion || 0),
       cogs: parseFloat(formData.cogs || 0),
@@ -102,6 +106,8 @@ const ProductsManager = () => {
       allowByPorcion: p.allowByPorcion ?? false,
       allowByAmount: p.allowByAmount ?? false,
       priceUnit: p.priceUnit || '',
+      priceHalfDozen: p.priceHalfDozen || '',
+      priceDozen: p.priceDozen || '',
       priceKg: p.priceKg || '',
       pricePorcion: p.pricePorcion || '',
       cogs: p.cogs || '',
@@ -160,7 +166,7 @@ const ProductsManager = () => {
             <div style={{ display: 'flex', gap: '16px', marginTop: '8px', flexWrap: 'wrap' }}>
               <label style={styles.checkboxLabel}>
                 <input type="checkbox" name="allowByUnit" checked={formData.allowByUnit} onChange={handleChange} />
-                Por Unidad (Facturas, Panes)
+                Por Unidad / Docenas (Facturas, Panes)
               </label>
               <label style={styles.checkboxLabel}>
                 <input type="checkbox" name="allowByWeight" checked={formData.allowByWeight} onChange={handleChange} />
@@ -180,10 +186,20 @@ const ProductsManager = () => {
           {/* Secciones Dinámicas de Precios (Auto-calculados o editables) */}
           <div style={styles.formRow}>
             {formData.allowByUnit && (
-              <div style={styles.group}>
-                <label style={styles.label}>Precio por Unidad ($)</label>
-                <input type="number" step="0.01" name="priceUnit" value={formData.priceUnit} onChange={handleChange} placeholder="Ej. 500" style={styles.input} required={formData.allowByUnit} />
-              </div>
+              <>
+                <div style={styles.group}>
+                  <label style={styles.label}>Precio por Unidad ($)</label>
+                  <input type="number" step="0.01" name="priceUnit" value={formData.priceUnit} onChange={handleChange} placeholder="Ej. 500" style={styles.input} required={formData.allowByUnit} />
+                </div>
+                <div style={styles.group}>
+                  <label style={styles.label}>Precio 1/2 Docena ($)</label>
+                  <input type="number" step="0.01" name="priceHalfDozen" value={formData.priceHalfDozen} onChange={handleChange} placeholder="Ej. 2700 (Opcional)" style={styles.input} />
+                </div>
+                <div style={styles.group}>
+                  <label style={styles.label}>Precio Docena ($)</label>
+                  <input type="number" step="0.01" name="priceDozen" value={formData.priceDozen} onChange={handleChange} placeholder="Ej. 5000 (Opcional)" style={styles.input} />
+                </div>
+              </>
             )}
 
             {(formData.allowByWeight || formData.allowByAmount) && (
@@ -291,6 +307,8 @@ const ProductsManager = () => {
                       <td style={styles.td}>
                         <div style={{ fontSize: '0.78rem', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                           {p.allowByUnit && <div>• Un: <strong>${parseFloat(p.priceUnit || 0).toFixed(2)}</strong></div>}
+                          {p.priceHalfDozen > 0 && <div>• 1/2 Doc: <strong>${parseFloat(p.priceHalfDozen).toFixed(2)}</strong></div>}
+                          {p.priceDozen > 0 && <div>• Docena: <strong>${parseFloat(p.priceDozen).toFixed(2)}</strong></div>}
                           {p.allowByWeight && <div>• Kg: <strong>${parseFloat(p.priceKg || 0).toFixed(2)}</strong></div>}
                           {p.allowByPorcion && <div>• Porción: <strong>${parseFloat(p.pricePorcion || 0).toFixed(2)}</strong></div>}
                         </div>

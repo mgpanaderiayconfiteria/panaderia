@@ -25,6 +25,8 @@ exports.createProduct = async (req, res) => {
       allowByPorcion,
       allowByAmount,
       priceUnit,
+      priceHalfDozen,
+      priceDozen,
       priceKg,
       pricePorcion,
       cogs,
@@ -35,10 +37,12 @@ exports.createProduct = async (req, res) => {
     } = req.body;
 
     const parsedPriceUnit = parseFloat(priceUnit || 0);
+    const parsedPriceHalfDozen = parseFloat(priceHalfDozen || 0);
+    const parsedPriceDozen = parseFloat(priceDozen || 0);
     const parsedPriceKg = parseFloat(priceKg || 0);
     const parsedPricePorcion = parseFloat(pricePorcion || 0);
 
-    const mainPrice = parsedPriceUnit || parsedPriceKg || parsedPricePorcion || 0;
+    const mainPrice = parsedPriceUnit || parsedPriceHalfDozen || parsedPriceDozen || parsedPriceKg || parsedPricePorcion || 0;
 
     let primaryStock = 0;
     let primaryStockUnit = 'un';
@@ -62,6 +66,8 @@ exports.createProduct = async (req, res) => {
       allowByPorcion: Boolean(allowByPorcion),
       allowByAmount: Boolean(allowByAmount),
       priceUnit: parsedPriceUnit,
+      priceHalfDozen: parsedPriceHalfDozen,
+      priceDozen: parsedPriceDozen,
       priceKg: parsedPriceKg,
       pricePorcion: parsedPricePorcion,
       price: mainPrice,
@@ -91,6 +97,8 @@ exports.updateProduct = async (req, res) => {
   try {
     const {
       priceUnit,
+      priceHalfDozen,
+      priceDozen,
       priceKg,
       pricePorcion,
       allowByUnit,
@@ -102,11 +110,15 @@ exports.updateProduct = async (req, res) => {
     } = req.body;
 
     const parsedPriceUnit = parseFloat(priceUnit || 0);
+    const parsedPriceHalfDozen = parseFloat(priceHalfDozen || 0);
+    const parsedPriceDozen = parseFloat(priceDozen || 0);
     const parsedPriceKg = parseFloat(priceKg || 0);
     const parsedPricePorcion = parseFloat(pricePorcion || 0);
 
     const updateData = { ...req.body };
-    updateData.price = parsedPriceUnit || parsedPriceKg || parsedPricePorcion || req.body.price || 0;
+    updateData.priceHalfDozen = parsedPriceHalfDozen;
+    updateData.priceDozen = parsedPriceDozen;
+    updateData.price = parsedPriceUnit || parsedPriceHalfDozen || parsedPriceDozen || parsedPriceKg || parsedPricePorcion || req.body.price || 0;
 
     if (allowByUnit) {
       updateData.stock = parseFloat(stockUnits || 0);
