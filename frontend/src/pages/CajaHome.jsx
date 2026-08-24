@@ -20,9 +20,10 @@ const CajaHome = () => {
   const [showWasteModal, setShowWasteModal] = useState(false);
   const [showQuickProdModal, setShowQuickProdModal] = useState(false);
 
-  // Estados de Gestión de Caja y Mermas
+  // Estados de Gestión de Caja, Arqueo y Mermas
   const [initialCash, setInitialCash] = useState(localStorage.getItem('mg_initial_cash') || '0');
   const [tempCashInput, setTempCashInput] = useState('');
+  const [actualCashInput, setActualCashInput] = useState(''); // Efectivo real contado al cerrar
   const [selectedWasteProd, setSelectedWasteProd] = useState('');
   const [wasteQty, setWasteQty] = useState('');
   const [newProd, setNewProd] = useState({ name: '', price: '', cost: '', stock: '', category: 'Panadería' });
@@ -47,6 +48,10 @@ const CajaHome = () => {
   const fondoInicialNum = parseFloat(initialCash) || 0;
   const efectivoEsperadoEnCaja = fondoInicialNum + totalEfectivoVentas;
   const recaudacionTotalProcesada = totalEfectivoVentas + totalDigital;
+
+  // Cálculo de descuadre en tiempo real
+  const efectivoRealNum = parseFloat(actualCashInput) || 0;
+  const diferenciaCaja = actualCashInput !== '' ? efectivoRealNum - efectivoEsperadoEnCaja : 0;
 
   // Confirmar Apertura de Caja
   const handleConfirmApertura = () => {
@@ -114,9 +119,35 @@ const CajaHome = () => {
     }
   };
 
-  // Finalizar Turno y Limpiar Sesión de Caja
-  const handleFinalizarTurno = () => {
-    alert(`Turno cerrado exitosamente.\nEntregar en efectivo: $${efectivoEsperadoEnCaja.toFixed(2)}`);
+  // Finalizar Turno con Arqueo Completo
+  const handleFinalizarTurno = async () => {
+    if (actualCashInput === '') {
+      alert('Por favor ingrese el monto de efectivo real contado en la caja.');
+      return;
+    }
+
+    const closurePayload = {
+      employee: user?.name || user?.username || 'Cajera',
+      initialCash: fondoInicialNum,
+      cashSales: totalEfectivoVentas,
+      digitalSales: totalDigital,
+      expectedCash: efectivoEsperadoEnCaja,
+      actualCash: efectivoRealNum,
+      difference: diferenciaCaja,
+      totalRevenue: recaudacionTotalProcesada
+    };
+
+    try {
+      await fetch(`${API_URL}/api/shifts/close`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(closurePayload)
+      });
+    } catch (e) {
+      console.warn('Servidor no disponible para guardar el reporte físico del turno, cerrando sesión local.');
+    }
+
+    alert(`Turno cerrado exitosamente.\n\nEfectivo Esperado: $${efectivoEsperadoEnCaja.toFixed(2)}\nEfectivo Real: $${efectivoRealNum.toFixed(2)}\nDiferencia: $${diferenciaCaja.toFixed(2)}`);
     localStorage.removeItem('mg_initial_cash');
     setShowCierreModal(false);
     navigate('/login');
@@ -276,7 +307,7 @@ const CajaHome = () => {
         </div>
       )}
 
-      {/* MODAL CIERRE DE TURNO Y ARQUEO */}
+      {/* MODAL CIERRE DE TURNO Y ARQUEO COMPLETO */}
       {showCierreModal && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalCard}>
@@ -285,10 +316,10 @@ const CajaHome = () => {
               <button onClick={() => setShowCierreModal(false)} style={styles.btnCloseModal}>✕</button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', margin: '10px 0' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: '10px 0' }}>
               <div style={styles.resumenRow}>
                 <span>Ventas Totales:</span>
-                <strong>{sales ? sales.length : 0} ventas</strong>
+                <strong>{sales ? sales.length : 0} órdenes</strong>
               </div>
               <div style={styles.resumenRow}>
                 <span>Fondo Inicial de Caja:</span>
@@ -307,13 +338,40 @@ const CajaHome = () => {
 
               <div style={{ ...styles.resumenRow, backgroundColor: '#f0fdf4', padding: '8px', borderRadius: '6px' }}>
                 <span style={{ fontWeight: 'bold', color: '#166534' }}>EFECTIVO ESPERADO EN CAJA:</span>
-                <strong style={{ fontSize: '1.2rem', color: '#166534' }}>${efectivoEsperadoEnCaja.toFixed(2)}</strong>
+                <strong style={{ fontSize: '1.1rem', color: '#166534' }}>${efectivoEsperadoEnCaja.toFixed(2)}</strong>
               </div>
 
-              <div style={styles.resumenRow}>
-                <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Recaudación Total Bruta:</span>
-                <strong style={{ fontSize: '0.95rem', color: '#0f172a' }}>${recaudacionTotalProcesada.toFixed(2)}</strong>
+              {/* INPUT PARA INGRESAR EFECTIVO REAL FÍSICO */}
+              <div style={{ marginTop: '8px' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#334155', display: 'block', marginBottom: '4px' }}>
+                  💵 Efectivo Real Contado en Caja ($):
+                </label>
+                <input
+                  type="number"
+                  placeholder="Ej. 12500"
+                  value={actualCashInput}
+                  onChange={(e) => setActualCashInput(e.target.value)}
+                  style={{ ...styles.inputForm, border: '2px solid #0284c7', fontSize: '1.05rem', fontWeight: 'bold' }}
+                />
               </div>
+
+              {/* INDICADOR DE DESCUADRE / DIFERENCIA */}
+              {actualCashInput !== '' && (
+                <div style={{
+                  padding: '8px',
+                  borderRadius: '6px',
+                  fontSize: '0.85rem',
+                  fontWeight: 'bold',
+                  textAlign: 'center',
+                  backgroundColor: diferenciaCaja === 0 ? '#f0fdf4' : diferenciaCaja > 0 ? '#eff6ff' : '#fef2f2',
+                  color: diferenciaCaja === 0 ? '#166534' : diferenciaCaja > 0 ? '#1d4ed8' : '#dc2626',
+                  border: `1px solid ${diferenciaCaja === 0 ? '#bbf7d0' : diferenciaCaja > 0 ? '#bfdbfe' : '#fecaca'}`
+                }}>
+                  {diferenciaCaja === 0 && '✅ Caja Cuadrada Perfecta'}
+                  {diferenciaCaja > 0 && `🔵 Sobrante en Caja: +$${diferenciaCaja.toFixed(2)}`}
+                  {diferenciaCaja < 0 && `⚠️ Faltante en Caja: -$${Math.abs(diferenciaCaja).toFixed(2)}`}
+                </div>
+              )}
             </div>
 
             <button onClick={handleFinalizarTurno} style={styles.btnConfirmarCierre}>
@@ -344,7 +402,7 @@ const styles = {
   modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '8px', borderBottom: '1px solid #e2e8f0' },
   btnCloseModal: { backgroundColor: '#e2e8f0', color: '#334155', border: 'none', padding: '6px 12px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem' },
   modalBody: { padding: '20px', overflowY: 'auto', flex: 1 },
-  resumenRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.95rem', color: '#334155' },
+  resumenRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.9rem', color: '#334155' },
   inputForm: { padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.95rem', width: '100%', boxSizing: 'border-box' },
   btnConfirmarVerde: { width: '100%', padding: '12px', backgroundColor: '#15803d', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.95rem', cursor: 'pointer' },
   btnConfirmarRojo: { width: '100%', padding: '12px', backgroundColor: '#dc2626', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.95rem', cursor: 'pointer' },

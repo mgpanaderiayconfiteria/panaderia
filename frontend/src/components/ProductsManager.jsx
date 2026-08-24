@@ -12,6 +12,7 @@ const INITIAL_FORM = {
   priceKg: '',
   pricePorcion: '',
   cogs: '',
+  desiredMargin: '', // Margen porcentual deseado (%)
   stockUnits: '',
   stockGrams: '',
   stockPorciones: '',
@@ -23,12 +24,35 @@ const ProductsManager = () => {
   const [formData, setFormData] = useState(INITIAL_FORM);
   const [editingId, setEditingId] = useState(null);
 
+  // Manejo de cambios generales
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
+  };
+
+  // 🧮 Lógica de auto-cálculo de Margen % y Precios
+  const handleCostOrMarginChange = (e) => {
+    const { name, value } = e.target;
+    const numVal = parseFloat(value) || 0;
+
+    setFormData((prev) => {
+      const updated = { ...prev, [name]: value };
+      const cost = name === 'cogs' ? numVal : parseFloat(prev.cogs) || 0;
+      const margin = name === 'desiredMargin' ? numVal : parseFloat(prev.desiredMargin) || 0;
+
+      // Si hay un costo y un margen definidos, auto-calculamos los precios activos
+      if (cost > 0 && margin > 0) {
+        const calculatedPrice = (cost * (1 + margin / 100)).toFixed(2);
+
+        if (prev.allowByUnit) updated.priceUnit = calculatedPrice;
+        if (prev.allowByWeight || prev.allowByAmount) updated.priceKg = calculatedPrice;
+        if (prev.allowByPorcion) updated.pricePorcion = calculatedPrice;
+      }
+      return updated;
+    });
   };
 
   const handleImageChange = (e) => {
@@ -50,6 +74,7 @@ const ProductsManager = () => {
       priceKg: parseFloat(formData.priceKg || 0),
       pricePorcion: parseFloat(formData.pricePorcion || 0),
       cogs: parseFloat(formData.cogs || 0),
+      desiredMargin: parseFloat(formData.desiredMargin || 0),
       stockUnits: parseFloat(formData.stockUnits || 0),
       stockGrams: parseFloat(formData.stockGrams || 0),
       stockPorciones: parseFloat(formData.stockPorciones || 0)
@@ -61,6 +86,14 @@ const ProductsManager = () => {
 
   const handleEdit = (p) => {
     setEditingId(p._id || p.id);
+    const cost = parseFloat(p.cogs || 0);
+    const price = parseFloat(p.priceUnit || p.priceKg || p.pricePorcion || 0);
+    let calculatedMargin = p.desiredMargin || '';
+
+    if (!calculatedMargin && cost > 0 && price > 0) {
+      calculatedMargin = (((price - cost) / cost) * 100).toFixed(1);
+    }
+
     setFormData({
       name: p.name || '',
       category: p.category || 'Panadería',
@@ -72,6 +105,7 @@ const ProductsManager = () => {
       priceKg: p.priceKg || '',
       pricePorcion: p.pricePorcion || '',
       cogs: p.cogs || '',
+      desiredMargin: calculatedMargin,
       stockUnits: p.stockUnits || '',
       stockGrams: p.stockGrams || '',
       stockPorciones: p.stockPorciones || '',
@@ -93,7 +127,7 @@ const ProductsManager = () => {
   return (
     <div style={{ width: '100%' }}>
       <div style={styles.card}>
-        <h2 style={styles.title}>{editingId ? 'EDITAR PRODUCTO MULTI-MODAL' : 'ALTA DE PRODUCTO MULTI-MODAL'}</h2>
+        <h2 style={styles.title}>{editingId ? 'EDITAR PRODUCTO Y MARGEN' : 'ALTA DE PRODUCTO Y CÁLCULO DE MARGEN'}</h2>
         <form onSubmit={handleSubmit} style={styles.formContainer}>
           
           <div style={styles.formRow}>
@@ -110,8 +144,13 @@ const ProductsManager = () => {
             </div>
 
             <div style={styles.group}>
-              <label style={styles.label}>Costo Est. ($)</label>
-              <input type="number" step="0.01" name="cogs" value={formData.cogs} onChange={handleChange} placeholder="0.00" style={styles.input} />
+              <label style={styles.label}>Costo / Insumos ($)</label>
+              <input type="number" step="0.01" name="cogs" value={formData.cogs} onChange={handleCostOrMarginChange} placeholder="Ej. 200" style={styles.input} />
+            </div>
+
+            <div style={{ ...styles.group, backgroundColor: '#f0fdf4', padding: '6px', borderRadius: '4px', border: '1px solid #bbf7d0' }}>
+              <label style={{ ...styles.label, color: '#166534' }}>Margen Deseado (%)</label>
+              <input type="number" step="0.1" name="desiredMargin" value={formData.desiredMargin} onChange={handleCostOrMarginChange} placeholder="Ej. 80" style={{ ...styles.input, fontWeight: 'bold' }} />
             </div>
           </div>
 
@@ -138,7 +177,7 @@ const ProductsManager = () => {
             </div>
           </div>
 
-          {/* Secciones Dinámicas de Precios */}
+          {/* Secciones Dinámicas de Precios (Auto-calculados o editables) */}
           <div style={styles.formRow}>
             {formData.allowByUnit && (
               <div style={styles.group}>
@@ -202,7 +241,7 @@ const ProductsManager = () => {
         </form>
       </div>
 
-      {/* Tabla del Catálogo con Detalle Multi-Modal */}
+      {/* Tabla del Catálogo con Detalle Multi-Modal y Margen */}
       <div style={{ ...styles.card, marginTop: '20px' }}>
         <h2 style={styles.title}>CATÁLOGO COMPLETO DE PRODUCTOS</h2>
         {products.length === 0 ? <p style={{ color: '#94a3b8', fontSize: '0.85rem' }}>No hay productos cargados.</p> : (
@@ -212,7 +251,7 @@ const ProductsManager = () => {
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                   <th style={styles.th}>Imagen</th>
                   <th style={styles.th}>Nombre</th>
-                  <th style={styles.th}>Categoría</th>
+                  <th style={styles.th}>Costo / Margen</th>
                   <th style={styles.th}>Modalidades Habilitadas</th>
                   <th style={styles.th}>Precios de Venta</th>
                   <th style={styles.th}>Inventario / Stock</th>
@@ -222,13 +261,25 @@ const ProductsManager = () => {
               <tbody>
                 {products.map((p) => {
                   const prodId = p._id || p.id;
+                  const cost = parseFloat(p.cogs || 0);
+                  const price = parseFloat(p.priceUnit || p.priceKg || p.pricePorcion || 0);
+                  const margin = cost > 0 && price > 0 ? (((price - cost) / price) * 100).toFixed(1) : 0;
+
                   return (
                     <tr key={prodId} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={styles.td}>
                         {p.image ? <img src={p.image} alt={p.name} style={styles.tableImg} /> : <div style={styles.noImg}>Sin foto</div>}
                       </td>
-                      <td style={styles.td}><strong>{p.name}</strong></td>
-                      <td style={styles.td}><span style={styles.badgeCat}>{p.category || 'Panadería'}</span></td>
+                      <td style={styles.td}>
+                        <strong>{p.name}</strong>
+                        <div><span style={styles.badgeCat}>{p.category || 'Panadería'}</span></div>
+                      </td>
+                      <td style={styles.td}>
+                        <div style={{ fontSize: '0.78rem' }}>
+                          <div>Costo: <strong>${cost.toFixed(2)}</strong></div>
+                          <div style={{ color: margin > 30 ? '#166534' : '#b45309', fontWeight: 'bold' }}>Margen: {margin}%</div>
+                        </div>
+                      </td>
                       <td style={styles.td}>
                         <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                           {p.allowByUnit && <span style={styles.badgeType}>UNIDAD</span>}
@@ -286,7 +337,7 @@ const styles = {
   td: { padding: '10px 8px', color: '#334155', verticalAlign: 'middle' },
   tableImg: { width: '36px', height: '36px', borderRadius: '4px', objectFit: 'cover' },
   noImg: { width: '36px', height: '36px', borderRadius: '4px', backgroundColor: '#f1f5f9', color: '#94a3b8', fontSize: '0.65rem', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  badgeCat: { backgroundColor: '#e2e8f0', color: '#1e293b', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '500' },
+  badgeCat: { backgroundColor: '#e2e8f0', color: '#1e293b', padding: '2px 8px', borderRadius: '12px', fontSize: '0.70rem', fontWeight: '500' },
   badgeType: { backgroundColor: '#f1f5f9', color: '#0f172a', border: '1px solid #cbd5e1', padding: '2px 6px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: '600' },
   btnEdit: { backgroundColor: '#2563eb', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold', marginRight: '6px', cursor: 'pointer' },
   btnDel: { backgroundColor: '#dc2626', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer' }
