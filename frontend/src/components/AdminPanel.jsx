@@ -12,6 +12,9 @@ const AdminPanel = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [wasteLogs, setWasteLogs] = useState([]);
 
+  // Estado para filtrado por fecha específica
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+
   // Cargar registros de desperdicio/mermas desde el servidor
   useEffect(() => {
     fetch(`${API_URL}/api/shifts/waste`)
@@ -20,16 +23,27 @@ const AdminPanel = () => {
       .catch((err) => console.error('Error al cargar mermas:', err));
   }, []);
 
+  // Filtrado de ventas según la fecha elegida
+  const filteredSales = useMemo(() => {
+    if (!selectedDate) return sales;
+    return sales.filter((sale) => {
+      const saleDateStr = new Date(sale.createdAt || sale.timestamp || Date.now())
+        .toISOString()
+        .split('T')[0];
+      return saleDateStr === selectedDate;
+    });
+  }, [sales, selectedDate]);
+
   // 1. Total Ingresos Totales
   const totalEarnings = useMemo(() => {
-    return sales.reduce((acc, sale) => acc + (parseFloat(sale.total) || 0), 0);
-  }, [sales]);
+    return filteredSales.reduce((acc, sale) => acc + (parseFloat(sale.total) || 0), 0);
+  }, [filteredSales]);
 
   // 2. Ventas por Turno (Mañana: 06:00 a 13:59 | Tarde: 14:00 a 22:00)
   const shiftTotals = useMemo(() => {
     let morning = 0;
     let afternoon = 0;
-    sales.forEach((sale) => {
+    filteredSales.forEach((sale) => {
       const saleDate = new Date(sale.createdAt || sale.timestamp || Date.now());
       const hour = saleDate.getHours();
       const amount = parseFloat(sale.total) || 0;
@@ -37,12 +51,12 @@ const AdminPanel = () => {
       else afternoon += amount;
     });
     return { morning, afternoon };
-  }, [sales]);
+  }, [filteredSales]);
 
   // 3. Ventas por Vendedor (Agrupado por Empleado)
   const salesBySeller = useMemo(() => {
     const map = {};
-    sales.forEach((sale) => {
+    filteredSales.forEach((sale) => {
       const sellerName = sale.employee || sale.sellerName || sale.cashier || 'Caja General';
       const amount = parseFloat(sale.total) || 0;
       if (!map[sellerName]) {
@@ -57,12 +71,12 @@ const AdminPanel = () => {
       }
     });
     return map;
-  }, [sales]);
+  }, [filteredSales]);
 
   // 4. Mapeo de Ventas por Producto
   const productSalesMap = useMemo(() => {
     const map = {};
-    sales.forEach((sale) => {
+    filteredSales.forEach((sale) => {
       if (Array.isArray(sale.items)) {
         sale.items.forEach((item) => {
           const prodId = item.productId || item.product || item.id;
@@ -75,16 +89,45 @@ const AdminPanel = () => {
       }
     });
     return map;
-  }, [sales]);
+  }, [filteredSales]);
 
-  // Top 5 Productos más vendidos
+  // 5. Lista de productos con Análisis de Ganancia Neta ($) ordenada de MAYOR a MENOR ganancia
+  const productsProfitability = useMemo(() => {
+    return products.map((p) => {
+      const prodId = p._id || p.id;
+      const realSales = productSalesMap[prodId] || { qty: 0, revenue: 0 };
+      const unitsSold = realSales.qty;
+      const revenue = realSales.revenue;
+      const unitCost = parseFloat(p.cost || p.cogs || 0);
+      const totalCogs = unitCost * unitsSold;
+      const netProfit = revenue - totalCogs;
+      const priceUnit = parseFloat(p.priceUnit || p.price || p.priceKg || 0);
+      const marginPct = priceUnit > 0 ? (((priceUnit - unitCost) / priceUnit) * 100).toFixed(1) : 0;
+
+      return {
+        ...p,
+        unitsSold,
+        revenue,
+        totalCogs,
+        netProfit,
+        marginPct
+      };
+    }).sort((a, b) => b.netProfit - a.netProfit);
+  }, [products, productSalesMap]);
+
+  // Total Ganancia Neta General del Día
+  const totalNetProfit = useMemo(() => {
+    return productsProfitability.reduce((acc, p) => acc + p.netProfit, 0);
+  }, [productsProfitability]);
+
+  // Top 5 Productos más vendidos por volumen
   const topProductsList = useMemo(() => {
     return Object.values(productSalesMap)
       .sort((a, b) => b.qty - a.qty)
       .slice(0, 5);
   }, [productSalesMap]);
 
-  // Pérdida total por desperdicio acumulado
+  // Pérdida total por desperdicio
   const totalWasteLoss = useMemo(() => {
     return wasteLogs.reduce((acc, log) => acc + (parseFloat(log.totalLoss) || 0), 0);
   }, [wasteLogs]);
@@ -193,21 +236,39 @@ const AdminPanel = () => {
         <main style={styles.mainContent}>
           <div style={styles.headerRow}>
             <h1 style={styles.pageTitle}>PANEL DE CONTROL MG PANADERÍA</h1>
+            
+            {/* SELECTOR DE FECHA HISTÓRICO */}
             <div style={styles.dateSelector}>
-              <span style={styles.dateButton}>📅 Hoy</span>
-              <span style={styles.dateText}>{new Date().toLocaleDateString('es-AR')}</span>
+              <span style={styles.dateButton}>📅 Consultar Día:</span>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                style={styles.dateInput}
+              />
+              <button 
+                onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])} 
+                style={styles.btnResetDate}
+              >
+                Hoy
+              </button>
             </div>
           </div>
 
           <div style={styles.topGrid}>
-            {/* CARD 1: VENTAS Y TURNOS */}
+            {/* CARD 1: VENTAS Y GANANCIA NETA DEL DÍA */}
             <div style={styles.card}>
               <div style={styles.cardHeader}>
-                <h2 style={styles.cardTitle}>RESUMEN DE VENTAS DIARIAS</h2>
+                <h2 style={styles.cardTitle}>RESUMEN DE CAJA Y GANANCIA NETAS</h2>
               </div>
-              <div style={styles.chartWrapper}>
-                <div style={styles.tooltipBox}>
-                  Total Registrado: <strong>${totalEarnings.toFixed(2)}</strong>
+              <div style={styles.kpiRow}>
+                <div style={styles.kpiBox}>
+                  <div style={styles.kpiLabel}>Facturación Bruta</div>
+                  <div style={styles.kpiValueBlue}>${totalEarnings.toFixed(2)}</div>
+                </div>
+                <div style={styles.kpiBox}>
+                  <div style={styles.kpiLabel}>Ganancia Neta Real</div>
+                  <div style={styles.kpiValueGreen}>${totalNetProfit.toFixed(2)}</div>
                 </div>
               </div>
               <div style={styles.subChartSection}>
@@ -227,7 +288,7 @@ const AdminPanel = () => {
 
             {/* CARD 2: PRODUCTOS MÁS VENDIDOS */}
             <div style={styles.card}>
-              <h2 style={styles.cardTitle}>PRODUCTOS MÁS VENDIDOS</h2>
+              <h2 style={styles.cardTitle}>PRODUCTOS MÁS VENDIDOS (CANTIDAD)</h2>
               <div style={styles.donutGrid}>
                 <div style={styles.topProductsTable}>
                   <div style={styles.topProdHeader}>
@@ -235,7 +296,7 @@ const AdminPanel = () => {
                     <span>Vendidos</span>
                   </div>
                   {topProductsList.length === 0 ? (
-                    <div style={styles.emptyRow}>Sin ventas registradas</div>
+                    <div style={styles.emptyRow}>Sin ventas registradas en la fecha</div>
                   ) : (
                     topProductsList.map((p, idx) => (
                       <div key={idx} style={styles.topProdRow}>
@@ -248,35 +309,51 @@ const AdminPanel = () => {
               </div>
             </div>
 
-            {/* CARD 3: ALERTAS DE STOCK */}
+            {/* CARD 3: ALERTAS DE STOCK Y DESPERDICIO (AGRUPADAS) */}
             <div style={styles.card}>
               <h2 style={styles.cardTitle}>ALERTAS DE STOCK Y DESPERDICIO</h2>
               <div style={styles.sidebarSection}>
-                {products.filter((p) => (p.stock || 0) <= 5).length === 0 ? (
-                  <div style={styles.badgeGray}>Stock normal en todos los productos</div>
-                ) : (
-                  products
-                    .filter((p) => (p.stock || 0) <= 5)
-                    .map((p) => (
-                      <div key={p.id || p._id} style={styles.badgeGray}>
-                        {p.name}: <span style={{ color: '#dc2626', fontWeight: 'bold' }}>STOCK BAJO ({p.stock || 0})</span>
-                      </div>
-                    ))
-                )}
-                {wasteLogs.length > 0 && (
-                  <div style={{ ...styles.badgeGray, backgroundColor: '#fef2f2', border: '1px solid #fecaca', marginTop: '10px' }}>
-                    ⚠️ <strong style={{ color: '#991b1b' }}>{wasteLogs.length} mermas registradas hoy</strong>
-                  </div>
-                )}
+                {(() => {
+                  const lowStockProducts = products.filter((p) => (p.stock || 0) <= 5);
+
+                  if (lowStockProducts.length === 0 && wasteLogs.length === 0) {
+                    return <div style={styles.badgeGray}>Stock normal y sin mermas activas</div>;
+                  }
+
+                  return (
+                    <>
+                      {/* Alerta agrupada de Stock Bajo */}
+                      {lowStockProducts.length > 0 && (
+                        <div style={{ ...styles.badgeGray, backgroundColor: '#fff7ed', border: '1px solid #ffedd5' }}>
+                          ⚠️ <strong style={{ color: '#c2410c' }}>{lowStockProducts.length} productos con stock bajo:</strong>
+                          <div style={styles.groupedList}>
+                            {lowStockProducts.map((p) => (
+                              <span key={p.id || p._id} style={styles.groupedItem}>
+                                • {p.name} (<strong>{p.stock || 0}</strong>)
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Alerta agrupada de Mermas */}
+                      {wasteLogs.length > 0 && (
+                        <div style={{ ...styles.badgeGray, backgroundColor: '#fef2f2', border: '1px solid #fecaca', marginTop: '10px' }}>
+                          🗑️ <strong style={{ color: '#991b1b' }}>{wasteLogs.length} mermas registradas</strong>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>
 
-          {/* NUEVA TABLA: RENDIMIENTO Y VENTAS POR VENDEDOR */}
+          {/* TABLA: AUDITORÍA DE CAJERA / EMPLEADO */}
           <div style={{ ...styles.card, marginBottom: '20px' }}>
-            <h2 style={styles.cardTitle}>VENTAS AUDITADAS POR VENDEDOR / CAJERA</h2>
+            <h2 style={styles.cardTitle}>VENTAS AUDITADAS POR VENDEDOR / CAJERA ({selectedDate || 'Histórico'})</h2>
             {Object.keys(salesBySeller).length === 0 ? (
-              <p style={styles.emptyText}>No hay ventas asignadas a vendedores aún.</p>
+              <p style={styles.emptyText}>No hay ventas registradas para esta fecha.</p>
             ) : (
               <table style={styles.table}>
                 <thead>
@@ -303,10 +380,13 @@ const AdminPanel = () => {
             )}
           </div>
 
-          {/* TABLA DE RENTABILIDAD COGS / COSTO VS MARGEN */}
+          {/* TABLA DE RENTABILIDAD ORDENADA POR GANANCIA NETA ($) */}
           <div style={styles.card}>
-            <h2 style={styles.cardTitle}>ANÁLISIS DE RENTABILIDAD Y COSTOS (COGS)</h2>
-            {products.length === 0 ? (
+            <h2 style={styles.cardTitle}>RANKING DE PRODUCTOS QUE MÁS GANANCIA NETA DEJARON ($)</h2>
+            <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '4px 0 10px 0' }}>
+              Ordenado automáticamente por el dinero líquido final generado tras restar el costo (COGS).
+            </p>
+            {productsProfitability.length === 0 ? (
               <p style={styles.emptyText}>No hay productos registrados en el catálogo.</p>
             ) : (
               <table style={styles.table}>
@@ -317,34 +397,24 @@ const AdminPanel = () => {
                     <th style={styles.th}>Ingresos Reales</th>
                     <th style={styles.th}>Costo Estimado (COGS)</th>
                     <th style={styles.th}>Margen (%)</th>
-                    <th style={styles.th}>Ganancia Neta Total</th>
+                    <th style={styles.th}>Ganancia Neta Total ($)</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {products.map((p) => {
-                    const prodId = p._id || p.id;
-                    const realSales = productSalesMap[prodId] || { qty: 0, revenue: 0 };
-                    const unitsSold = realSales.qty;
-                    const revenue = realSales.revenue;
-                    const unitCost = parseFloat(p.cost || p.cogs || 0);
-                    const totalCogs = unitCost * unitsSold;
-                    const totalProfit = revenue - totalCogs;
-                    const priceUnit = parseFloat(p.priceUnit || p.price || p.priceKg || 0);
-                    const margin = priceUnit > 0 ? (((priceUnit - unitCost) / priceUnit) * 100).toFixed(1) : 0;
-
-                    return (
-                      <tr key={prodId} style={styles.trBody}>
-                        <td style={styles.td}><strong>{p.name}</strong></td>
-                        <td style={styles.td}>{unitsSold.toFixed(2)}</td>
-                        <td style={styles.td}>${revenue.toFixed(2)}</td>
-                        <td style={styles.td}>${totalCogs.toFixed(2)}</td>
-                        <td style={{ ...styles.td, color: margin > 30 ? '#166534' : '#b45309', fontWeight: 'bold' }}>{margin}%</td>
-                        <td style={{ ...styles.td, color: totalProfit >= 0 ? '#166534' : '#dc2626', fontWeight: 'bold' }}>
-                          ${totalProfit.toFixed(2)}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {productsProfitability.map((p) => (
+                    <tr key={p._id || p.id} style={styles.trBody}>
+                      <td style={styles.td}><strong>{p.name}</strong></td>
+                      <td style={styles.td}>{p.unitsSold.toFixed(2)}</td>
+                      <td style={styles.td}>${p.revenue.toFixed(2)}</td>
+                      <td style={styles.td}>${p.totalCogs.toFixed(2)}</td>
+                      <td style={{ ...styles.td, color: p.marginPct > 30 ? '#166534' : '#b45309', fontWeight: 'bold' }}>
+                        {p.marginPct}%
+                      </td>
+                      <td style={{ ...styles.td, color: p.netProfit >= 0 ? '#166534' : '#dc2626', fontWeight: 'bold', fontSize: '0.85rem' }}>
+                        ${p.netProfit.toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             )}
@@ -368,15 +438,19 @@ const styles = {
   mainContent: { padding: '20px' },
   headerRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
   pageTitle: { fontSize: '1.25rem', fontWeight: 'bold', margin: 0, letterSpacing: '0.5px' },
-  dateSelector: { display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: '#ffffff', padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem' },
+  dateSelector: { display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#ffffff', padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem' },
   dateButton: { fontWeight: '600', color: '#334155' },
-  dateText: { color: '#64748b' },
-  topGrid: { display: 'grid', gridTemplateColumns: '1.2fr 1.1fr 0.7fr', gap: '15px', marginBottom: '20px' },
+  dateInput: { padding: '4px 8px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '0.85rem' },
+  btnResetDate: { backgroundColor: '#0284c7', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.75rem' },
+  topGrid: { display: 'grid', gridTemplateColumns: '1.3fr 1fr 0.7fr', gap: '15px', marginBottom: '20px' },
   card: { backgroundColor: '#ffffff', borderRadius: '8px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' },
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' },
   cardTitle: { fontSize: '0.85rem', fontWeight: 'bold', margin: 0, color: '#0f172a', letterSpacing: '0.5px' },
-  chartWrapper: { display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60px', marginBottom: '10px' },
-  tooltipBox: { backgroundColor: '#0f2337', color: '#ffffff', padding: '8px 14px', borderRadius: '6px', fontSize: '0.85rem', textAlign: 'center' },
+  kpiRow: { display: 'flex', gap: '15px', marginBottom: '15px' },
+  kpiBox: { flex: 1, backgroundColor: '#f8fafc', padding: '10px', borderRadius: '6px', border: '1px solid #e2e8f0' },
+  kpiLabel: { fontSize: '0.75rem', color: '#64748b', fontWeight: 'bold' },
+  kpiValueBlue: { fontSize: '1.1rem', fontWeight: 'bold', color: '#0284c7', marginTop: '2px' },
+  kpiValueGreen: { fontSize: '1.1rem', fontWeight: 'bold', color: '#166534', marginTop: '2px' },
   subChartSection: { borderTop: '1px solid #f1f5f9', paddingTop: '10px' },
   subChartTitle: { fontSize: '0.75rem', fontWeight: 'bold', color: '#475569', marginBottom: '6px' },
   subChartRow: { display: 'flex', justifyContent: 'space-around' },
@@ -387,7 +461,9 @@ const styles = {
   topProdHeader: { display: 'flex', justifyContent: 'space-between', backgroundColor: '#f1f5f9', padding: '6px 8px', fontWeight: 'bold', borderRadius: '4px' },
   topProdRow: { display: 'flex', justifyContent: 'space-between', padding: '6px 8px', borderBottom: '1px solid #f8fafc' },
   emptyRow: { padding: '12px 8px', color: '#94a3b8', fontSize: '0.8rem', textAlign: 'center' },
-  sidebarSection: { marginTop: '10px' },
+  sidebarSection: { marginTop: '10px', maxHeight: '180px', overflowY: 'auto' },
+  groupedList: { marginTop: '6px', fontSize: '0.75rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '3px' },
+  groupedItem: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   badgeGray: { backgroundColor: '#f1f5f9', padding: '8px 12px', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '6px', color: '#334155' },
   table: { width: '100%', borderCollapse: 'collapse', marginTop: '10px', fontSize: '0.8rem' },
   trHead: { backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' },
