@@ -1,9 +1,13 @@
 import React, { useContext } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthContext } from './context/AuthContext';
+import { AuthContext, AuthProvider } from './context/AuthContext';
+import { ProductProvider } from './context/ProductContext';
+import { SaleProvider } from './context/SaleContext';
+
 import Navbar from './components/Navbar';
 import Login from './pages/Login';
 import CajaHome from './pages/CajaHome';
+import NuevoCliente from './pages/NuevoCliente';
 import AdminPanel from './components/AdminPanel';
 
 function ProtectedRoute({ children, roleRequired }) {
@@ -13,7 +17,6 @@ function ProtectedRoute({ children, roleRequired }) {
     return <Navigate to="/login" replace />;
   }
 
-  // Si se requiere rol de admin y el usuario no lo es, se lo reorienta a la caja
   if (roleRequired === 'admin' && !isAdmin && user?.role !== 'admin') {
     return <Navigate to="/caja" replace />;
   }
@@ -21,10 +24,8 @@ function ProtectedRoute({ children, roleRequired }) {
   return children;
 }
 
-function App() {
+function AppContent() {
   const { user, isAdmin } = useContext(AuthContext);
-
-  // Determinar si el usuario posee privilegios administrativos
   const userIsAdmin = isAdmin || user?.role === 'admin';
 
   return (
@@ -36,7 +37,7 @@ function App() {
           element={user ? <Navigate to={userIsAdmin ? "/admin" : "/caja"} replace /> : <Login />} 
         />
         
-        {/* Vista exclusiva para Cajeros y personal operativo */}
+        {/* Vista principal de Caja */}
         <Route 
           path="/caja" 
           element={
@@ -46,7 +47,17 @@ function App() {
           } 
         />
 
-        {/* Panel exclusivo para Administrador */}
+        {/* Módulo Punto de Venta / Nuevo Cliente */}
+        <Route 
+          path="/nuevo-cliente" 
+          element={
+            <ProtectedRoute>
+              <NuevoCliente />
+            </ProtectedRoute>
+          } 
+        />
+
+        {/* Panel de Administrador */}
         <Route 
           path="/admin" 
           element={
@@ -56,13 +67,25 @@ function App() {
           } 
         />
 
-        {/* Redirección por defecto según perfil */}
+        {/* Redirección por defecto */}
         <Route 
           path="*" 
           element={<Navigate to={user ? (userIsAdmin ? "/admin" : "/caja") : "/login"} replace />} 
         />
       </Routes>
     </BrowserRouter>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <ProductProvider>
+        <SaleProvider>
+          <AppContent />
+        </SaleProvider>
+      </ProductProvider>
+    </AuthProvider>
   );
 }
 
