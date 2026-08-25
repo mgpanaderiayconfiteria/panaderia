@@ -9,7 +9,11 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const storedUser = localStorage.getItem('mg_user');
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (e) {
+        localStorage.removeItem('mg_user');
+      }
     }
     setLoading(false);
   }, []);
@@ -30,6 +34,9 @@ export const AuthProvider = ({ children }) => {
 
       setUser(data);
       localStorage.setItem('mg_user', JSON.stringify(data));
+      if (data.token) {
+        localStorage.setItem('mg_token', data.token);
+      }
       return { success: true, user: data };
     } catch (error) {
       // Fallback local: Administrador
@@ -64,9 +71,12 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Cierre de sesión centralizado
   const logout = () => {
     setUser(null);
     localStorage.removeItem('mg_user');
+    localStorage.removeItem('mg_token');
+    localStorage.removeItem('mg_initial_cash'); // Opcional: elimina también el fondo de caja activo
   };
 
   const value = {

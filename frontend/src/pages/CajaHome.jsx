@@ -10,7 +10,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const CajaHome = () => {
   const navigate = useNavigate();
   const { sales } = useContext(SaleContext);
-  const { user } = useContext(AuthContext);
+  const { user, logout } = useContext(AuthContext);
   const { products, fetchProducts, addProduct } = useContext(ProductContext);
 
   const [showCatalog, setShowCatalog] = useState(false);
@@ -153,8 +153,13 @@ const CajaHome = () => {
     }
 
     alert(`Turno cerrado exitosamente.\n\nEfectivo Esperado: $${efectivoEsperadoEnCaja.toFixed(2)}\nEfectivo Real: $${efectivoRealNum.toFixed(2)}\nDiferencia: $${diferenciaCaja.toFixed(2)}`);
+    
+    // Limpia variables de la sesión local
     localStorage.removeItem('mg_initial_cash');
     setShowCierreModal(false);
+
+    // Ejecuta deslogueo y manda a la pantalla de entrada
+    if (logout) logout();
     navigate('/login');
   };
 
