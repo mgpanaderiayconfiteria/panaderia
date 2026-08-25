@@ -9,7 +9,8 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const CajaHome = () => {
   const navigate = useNavigate();
-  const { sales } = useContext(SaleContext);
+  // Se obtiene la función clearSales o resetSales para limpiar las ventas en memoria
+  const { sales, clearSales, setSales } = useContext(SaleContext);
   const { user, logout } = useContext(AuthContext);
   const { products, fetchProducts, addProduct } = useContext(ProductContext);
 
@@ -154,8 +155,15 @@ const CajaHome = () => {
 
     alert(`Turno cerrado exitosamente.\n\nEfectivo Esperado: $${efectivoEsperadoEnCaja.toFixed(2)}\nEfectivo Real: $${efectivoRealNum.toFixed(2)}\nDiferencia: $${diferenciaCaja.toFixed(2)}`);
     
-    // Limpia variables de la sesión local
+    // CORRECCIÓN: Limpia las ventas del turno en memoria y elimina datos locales del turno
+    if (typeof clearSales === 'function') {
+      clearSales();
+    } else if (typeof setSales === 'function') {
+      setSales([]);
+    }
+    
     localStorage.removeItem('mg_initial_cash');
+    localStorage.removeItem('mg_current_shift_sales');
     setShowCierreModal(false);
 
     // Ejecuta deslogueo y manda a la pantalla de entrada

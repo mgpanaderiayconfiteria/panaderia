@@ -129,7 +129,8 @@ const NuevoCliente = () => {
       subtotal: totalCart,
       total: totalCart,
       paidAmount: given,
-      changeAmount: changeAmount
+      changeAmount: changeAmount,
+      timestamp: new Date().toISOString()
     });
 
     setShowCheckoutModal(false);
