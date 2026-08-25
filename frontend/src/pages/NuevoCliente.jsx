@@ -41,23 +41,51 @@ const NuevoCliente = () => {
     setQuantity('');
   };
 
+  // Cálculo del subtotal priorizando precios de 1/2 Docena y Docena si están configurados
   const calculatedSubtotal = useMemo(() => {
     if (!selectedProduct || !quantity || isNaN(parseFloat(quantity))) return 0;
     const val = parseFloat(quantity);
     const basePrice = parseFloat(selectedProduct.price || selectedProduct.priceUnit || selectedProduct.priceKg || 0);
 
-    if (sellMode === 'unit') return val * parseFloat(selectedProduct.priceUnit || basePrice);
+    if (sellMode === 'unit') {
+      const unitPrice = parseFloat(selectedProduct.priceUnit || basePrice);
+      const priceHalf = parseFloat(selectedProduct.priceHalfDozen || 0);
+      const priceDozen = parseFloat(selectedProduct.priceDozen || 0);
+
+      if (val === 6 && priceHalf > 0) {
+        return priceHalf;
+      }
+      if (val === 12 && priceDozen > 0) {
+        return priceDozen;
+      }
+
+      return val * unitPrice;
+    }
+
     if (sellMode === 'weight') return (val / 1000) * parseFloat(selectedProduct.priceKg || basePrice);
     if (sellMode === 'portion') return val * parseFloat(selectedProduct.pricePorcion || selectedProduct.pricePortion || basePrice);
     if (sellMode === 'amount') return val;
     return 0;
   }, [selectedProduct, sellMode, quantity]);
 
+  // Agrega el item al pedido generando la etiqueta adecuada
   const handleAddToCart = () => {
     if (!selectedProduct || calculatedSubtotal <= 0) return;
     let detailLabel = '';
     const val = parseFloat(quantity);
-    if (sellMode === 'unit') detailLabel = `${val} un`;
+
+    if (sellMode === 'unit') {
+      const priceHalf = parseFloat(selectedProduct.priceHalfDozen || 0);
+      const priceDozen = parseFloat(selectedProduct.priceDozen || 0);
+
+      if (val === 6 && priceHalf > 0) {
+        detailLabel = '1/2 Docena (6 un)';
+      } else if (val === 12 && priceDozen > 0) {
+        detailLabel = '1 Docena (12 un)';
+      } else {
+        detailLabel = `${val} un`;
+      }
+    }
     if (sellMode === 'weight') detailLabel = `${val} gr (${(val / 1000).toFixed(2)} kg)`;
     if (sellMode === 'portion') detailLabel = `${val} porc`;
     if (sellMode === 'amount') detailLabel = `Monto libre ($${val})`;
