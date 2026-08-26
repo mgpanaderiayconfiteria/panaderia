@@ -30,6 +30,11 @@ exports.createProduct = async (req, res) => {
       priceDozen,
       priceKg,
       pricePorcion,
+      cogsUnit,
+      cogsHalfDozen,
+      cogsDozen,
+      cogsKg,
+      cogsPorcion,
       cogs,
       stockUnits,
       stockGrams,
@@ -37,12 +42,29 @@ exports.createProduct = async (req, res) => {
       image
     } = req.body;
 
+    // Parseo de precios de venta
     const parsedPriceUnit = parseFloat(priceUnit || 0);
     const parsedPriceHalfDozen = parseFloat(priceHalfDozen || 0);
     const parsedPriceDozen = parseFloat(priceDozen || 0);
     const parsedPriceKg = parseFloat(priceKg || 0);
     const parsedPricePorcion = parseFloat(pricePorcion || 0);
 
+    // Parseo de costos (COGS)
+    let parsedCogsUnit = parseFloat(cogsUnit || 0);
+    let parsedCogsHalfDozen = parseFloat(cogsHalfDozen || 0);
+    let parsedCogsDozen = parseFloat(cogsDozen || 0);
+    let parsedCogsKg = parseFloat(cogsKg || 0);
+    let parsedCogsPorcion = parseFloat(cogsPorcion || 0);
+
+    // Si no enviaron costo unitario pero sí docena/media docena, calculamos el unitario automáticamente
+    if (!parsedCogsUnit) {
+      if (parsedCogsDozen > 0) parsedCogsUnit = parsedCogsDozen / 12;
+      else if (parsedCogsHalfDozen > 0) parsedCogsUnit = parsedCogsHalfDozen / 6;
+      else if (cogs) parsedCogsUnit = parseFloat(cogs);
+    }
+
+    // Costo general de respaldo (retrocompatibilidad)
+    const mainCogs = parsedCogsUnit || (parsedCogsKg ? parsedCogsKg / 1000 : 0) || parsedCogsPorcion || parseFloat(cogs || 0);
     const mainPrice = parsedPriceUnit || parsedPriceHalfDozen || parsedPriceDozen || parsedPriceKg || parsedPricePorcion || 0;
 
     let primaryStock = 0;
@@ -73,7 +95,13 @@ exports.createProduct = async (req, res) => {
       priceKg: parsedPriceKg,
       pricePorcion: parsedPricePorcion,
       price: mainPrice,
-      cogs: parseFloat(cogs || 0),
+      // Guardar costos específicos
+      cogsUnit: parsedCogsUnit,
+      cogsHalfDozen: parsedCogsHalfDozen,
+      cogsDozen: parsedCogsDozen,
+      cogsKg: parsedCogsKg,
+      cogsPorcion: parsedCogsPorcion,
+      cogs: mainCogs,
       stockUnits: parseFloat(stockUnits || 0),
       stockGrams: parseFloat(stockGrams || 0),
       stockPorciones: parseFloat(stockPorciones || 0),
@@ -105,6 +133,12 @@ exports.updateProduct = async (req, res) => {
       priceDozen,
       priceKg,
       pricePorcion,
+      cogsUnit,
+      cogsHalfDozen,
+      cogsDozen,
+      cogsKg,
+      cogsPorcion,
+      cogs,
       allowByUnit,
       allowByWeight,
       allowByPorcion,
@@ -119,13 +153,37 @@ exports.updateProduct = async (req, res) => {
     const parsedPriceKg = parseFloat(priceKg || 0);
     const parsedPricePorcion = parseFloat(pricePorcion || 0);
 
+    let parsedCogsUnit = parseFloat(cogsUnit || 0);
+    let parsedCogsHalfDozen = parseFloat(cogsHalfDozen || 0);
+    let parsedCogsDozen = parseFloat(cogsDozen || 0);
+    let parsedCogsKg = parseFloat(cogsKg || 0);
+    let parsedCogsPorcion = parseFloat(cogsPorcion || 0);
+
+    if (!parsedCogsUnit) {
+      if (parsedCogsDozen > 0) parsedCogsUnit = parsedCogsDozen / 12;
+      else if (parsedCogsHalfDozen > 0) parsedCogsUnit = parsedCogsHalfDozen / 6;
+      else if (cogs) parsedCogsUnit = parseFloat(cogs);
+    }
+
+    const mainCogs = parsedCogsUnit || (parsedCogsKg ? parsedCogsKg / 1000 : 0) || parsedCogsPorcion || parseFloat(cogs || 0);
+
     const updateData = { ...req.body };
     if (category) updateData.category = category.trim();
     if (subcategory !== undefined) updateData.subcategory = subcategory.trim();
 
+    updateData.priceUnit = parsedPriceUnit;
     updateData.priceHalfDozen = parsedPriceHalfDozen;
     updateData.priceDozen = parsedPriceDozen;
+    updateData.priceKg = parsedPriceKg;
+    updateData.pricePorcion = parsedPricePorcion;
     updateData.price = parsedPriceUnit || parsedPriceHalfDozen || parsedPriceDozen || parsedPriceKg || parsedPricePorcion || req.body.price || 0;
+
+    updateData.cogsUnit = parsedCogsUnit;
+    updateData.cogsHalfDozen = parsedCogsHalfDozen;
+    updateData.cogsDozen = parsedCogsDozen;
+    updateData.cogsKg = parsedCogsKg;
+    updateData.cogsPorcion = parsedCogsPorcion;
+    updateData.cogs = mainCogs;
 
     if (allowByUnit) {
       updateData.stock = parseFloat(stockUnits || 0);

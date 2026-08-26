@@ -14,6 +14,12 @@ const INITIAL_FORM = {
   priceDozen: '',
   priceKg: '',
   pricePorcion: '',
+  // === NUEVOS CAMPOS DE COSTO (COGS) ===
+  cogsUnit: '',
+  cogsHalfDozen: '',
+  cogsDozen: '',
+  cogsKg: '',
+  cogsPorcion: '',
   cogs: '',
   desiredMargin: '',
   stockUnits: '',
@@ -35,21 +41,43 @@ const ProductsManager = () => {
     }));
   };
 
+  // Manejador Inteligente para sincronizar costos, margen y precios sugeridos
   const handleCostOrMarginChange = (e) => {
     const { name, value } = e.target;
     const numVal = parseFloat(value) || 0;
 
     setFormData((prev) => {
       const updated = { ...prev, [name]: value };
-      const cost = name === 'cogs' ? numVal : parseFloat(prev.cogs) || 0;
+
+      // Si modifica costo por docena, se deduce el unitario y media docena automáticamente
+      if (name === 'cogsDozen' && numVal > 0) {
+        updated.cogsUnit = (numVal / 12).toFixed(2);
+        updated.cogsHalfDozen = (numVal / 2).toFixed(2);
+        updated.cogs = updated.cogsUnit;
+      } else if (name === 'cogsUnit' && numVal > 0) {
+        updated.cogsHalfDozen = (numVal * 6).toFixed(2);
+        updated.cogsDozen = (numVal * 12).toFixed(2);
+        updated.cogs = value;
+      } else if (name === 'cogs') {
+        updated.cogsUnit = value;
+      }
+
+      const costUnit = parseFloat(updated.cogsUnit || updated.cogs) || 0;
       const margin = name === 'desiredMargin' ? numVal : parseFloat(prev.desiredMargin) || 0;
 
-      if (cost > 0 && margin > 0) {
-        const calculatedPrice = (cost * (1 + margin / 100)).toFixed(2);
+      // Calcular precio sugerido basado en costo unitario y margen
+      if (costUnit > 0 && margin > 0) {
+        const calculatedPriceUnit = (costUnit * (1 + margin / 100)).toFixed(2);
 
-        if (prev.allowByUnit) updated.priceUnit = calculatedPrice;
-        if (prev.allowByWeight || prev.allowByAmount) updated.priceKg = calculatedPrice;
-        if (prev.allowByPorcion) updated.pricePorcion = calculatedPrice;
+        if (prev.allowByUnit) {
+          updated.priceUnit = calculatedPriceUnit;
+          updated.priceHalfDozen = (calculatedPriceUnit * 6).toFixed(2);
+          updated.priceDozen = (calculatedPriceUnit * 12).toFixed(2);
+        }
+        if (prev.allowByWeight || prev.allowByAmount) {
+          const costKg = parseFloat(updated.cogsKg) || 0;
+          if (costKg > 0) updated.priceKg = (costKg * (1 + margin / 100)).toFixed(2);
+        }
       }
       return updated;
     });
@@ -77,7 +105,12 @@ const ProductsManager = () => {
       priceDozen: parseFloat(formData.priceDozen || 0),
       priceKg: parseFloat(formData.priceKg || 0),
       pricePorcion: parseFloat(formData.pricePorcion || 0),
-      cogs: parseFloat(formData.cogs || 0),
+      cogsUnit: parseFloat(formData.cogsUnit || formData.cogs || 0),
+      cogsHalfDozen: parseFloat(formData.cogsHalfDozen || 0),
+      cogsDozen: parseFloat(formData.cogsDozen || 0),
+      cogsKg: parseFloat(formData.cogsKg || 0),
+      cogsPorcion: parseFloat(formData.cogsPorcion || 0),
+      cogs: parseFloat(formData.cogsUnit || formData.cogs || 0),
       desiredMargin: parseFloat(formData.desiredMargin || 0),
       stockUnits: parseFloat(formData.stockUnits || 0),
       stockGrams: parseFloat(formData.stockGrams || 0),
@@ -90,12 +123,12 @@ const ProductsManager = () => {
 
   const handleEdit = (p) => {
     setEditingId(p._id || p.id);
-    const cost = parseFloat(p.cogs || 0);
-    const price = parseFloat(p.priceUnit || p.priceKg || p.pricePorcion || 0);
+    const costUnit = parseFloat(p.cogsUnit || p.cogs || 0);
+    const priceUnit = parseFloat(p.priceUnit || p.priceKg || p.pricePorcion || 0);
     let calculatedMargin = p.desiredMargin || '';
 
-    if (!calculatedMargin && cost > 0 && price > 0) {
-      calculatedMargin = (((price - cost) / cost) * 100).toFixed(1);
+    if (!calculatedMargin && costUnit > 0 && priceUnit > 0) {
+      calculatedMargin = (((priceUnit - costUnit) / costUnit) * 100).toFixed(1);
     }
 
     setFormData({
@@ -111,6 +144,11 @@ const ProductsManager = () => {
       priceDozen: p.priceDozen || '',
       priceKg: p.priceKg || '',
       pricePorcion: p.pricePorcion || '',
+      cogsUnit: p.cogsUnit || p.cogs || '',
+      cogsHalfDozen: p.cogsHalfDozen || '',
+      cogsDozen: p.cogsDozen || '',
+      cogsKg: p.cogsKg || '',
+      cogsPorcion: p.cogsPorcion || '',
       cogs: p.cogs || '',
       desiredMargin: calculatedMargin,
       stockUnits: p.stockUnits || '',
@@ -134,28 +172,23 @@ const ProductsManager = () => {
   return (
     <div style={{ width: '100%' }}>
       <div style={styles.card}>
-        <h2 style={styles.title}>{editingId ? 'EDITAR PRODUCTO Y MARGEN' : 'ALTA DE PRODUCTO Y CÁLCULO DE MARGEN'}</h2>
+        <h2 style={styles.title}>{editingId ? 'EDITAR PRODUCTO Y COSTOS' : 'ALTA DE PRODUCTO Y CÁLCULO DE MARGEN'}</h2>
         <form onSubmit={handleSubmit} style={styles.formContainer}>
           
           <div style={styles.formRow}>
             <div style={{ ...styles.group, flex: '2' }}>
               <label style={styles.label}>Nombre del Producto</label>
-              <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Ej. Tarta de Manzana / Pan Francés" style={styles.input} required />
+              <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Ej. Facturas de Manteca" style={styles.input} required />
             </div>
 
             <div style={styles.group}>
               <label style={styles.label}>Categoría</label>
-              <input type="text" name="category" value={formData.category} onChange={handleChange} placeholder="Ej. Panadería, Bebidas..." style={styles.input} required />
+              <input type="text" name="category" value={formData.category} onChange={handleChange} placeholder="Ej. Panadería" style={styles.input} required />
             </div>
 
             <div style={styles.group}>
               <label style={styles.label}>Subcategoría (Opcional)</label>
-              <input type="text" name="subcategory" value={formData.subcategory} onChange={handleChange} placeholder="Ej. Dulce, Salado..." style={styles.input} />
-            </div>
-
-            <div style={styles.group}>
-              <label style={styles.label}>Costo / Insumos ($)</label>
-              <input type="number" step="0.01" name="cogs" value={formData.cogs} onChange={handleCostOrMarginChange} placeholder="Ej. 200" style={styles.input} />
+              <input type="text" name="subcategory" value={formData.subcategory} onChange={handleChange} placeholder="Ej. Dulce" style={styles.input} />
             </div>
 
             <div style={{ ...styles.group, backgroundColor: '#f0fdf4', padding: '6px', borderRadius: '4px', border: '1px solid #bbf7d0' }}>
@@ -186,11 +219,49 @@ const ProductsManager = () => {
             </div>
           </div>
 
+          {/* SECCIÓN DE COSTOS (COGS) POR MODALIDAD */}
+          <div style={{ ...styles.optionsBox, backgroundColor: '#f8fafc', borderColor: '#cbd5e1' }}>
+            <span style={styles.optionsTitle}>Estructura de Costos / Insumos ($):</span>
+            <div style={{ ...styles.formRow, marginTop: '8px' }}>
+              {formData.allowByUnit && (
+                <>
+                  <div style={styles.group}>
+                    <label style={styles.label}>Costo 1 Unidad ($)</label>
+                    <input type="number" step="0.01" name="cogsUnit" value={formData.cogsUnit} onChange={handleCostOrMarginChange} placeholder="Ej. 45" style={styles.input} />
+                  </div>
+                  <div style={styles.group}>
+                    <label style={styles.label}>Costo 1/2 Docena ($)</label>
+                    <input type="number" step="0.01" name="cogsHalfDozen" value={formData.cogsHalfDozen} onChange={handleCostOrMarginChange} placeholder="Ej. 270" style={styles.input} />
+                  </div>
+                  <div style={styles.group}>
+                    <label style={styles.label}>Costo Docena ($)</label>
+                    <input type="number" step="0.01" name="cogsDozen" value={formData.cogsDozen} onChange={handleCostOrMarginChange} placeholder="Ej. 540" style={styles.input} />
+                  </div>
+                </>
+              )}
+
+              {(formData.allowByWeight || formData.allowByAmount) && (
+                <div style={styles.group}>
+                  <label style={styles.label}>Costo por Kilo ($)</label>
+                  <input type="number" step="0.01" name="cogsKg" value={formData.cogsKg} onChange={handleCostOrMarginChange} placeholder="Ej. 1200" style={styles.input} />
+                </div>
+              )}
+
+              {formData.allowByPorcion && (
+                <div style={styles.group}>
+                  <label style={styles.label}>Costo por Porción ($)</label>
+                  <input type="number" step="0.01" name="cogsPorcion" value={formData.cogsPorcion} onChange={handleCostOrMarginChange} placeholder="Ej. 350" style={styles.input} />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* SECCIÓN DE PRECIOS DE VENTA */}
           <div style={styles.formRow}>
             {formData.allowByUnit && (
               <>
                 <div style={styles.group}>
-                  <label style={styles.label}>Precio por Unidad ($)</label>
+                  <label style={styles.label}>Precio Venta Unidad ($)</label>
                   <input type="number" step="0.01" name="priceUnit" value={formData.priceUnit} onChange={handleChange} placeholder="Ej. 500" style={styles.input} required={formData.allowByUnit} />
                 </div>
                 <div style={styles.group}>
@@ -268,7 +339,7 @@ const ProductsManager = () => {
                   <th style={styles.th}>Imagen</th>
                   <th style={styles.th}>Nombre</th>
                   <th style={styles.th}>Categoría / Subcategoría</th>
-                  <th style={styles.th}>Costo / Margen</th>
+                  <th style={styles.th}>Costos (COGS)</th>
                   <th style={styles.th}>Modalidades</th>
                   <th style={styles.th}>Precios</th>
                   <th style={styles.th}>Stock</th>
@@ -278,9 +349,9 @@ const ProductsManager = () => {
               <tbody>
                 {products.map((p) => {
                   const prodId = p._id || p.id;
-                  const cost = parseFloat(p.cogs || 0);
-                  const price = parseFloat(p.priceUnit || p.priceKg || p.pricePorcion || 0);
-                  const margin = cost > 0 && price > 0 ? (((price - cost) / price) * 100).toFixed(1) : 0;
+                  const costUnit = parseFloat(p.cogsUnit || p.cogs || 0);
+                  const priceUnit = parseFloat(p.priceUnit || p.priceKg || p.pricePorcion || 0);
+                  const margin = costUnit > 0 && priceUnit > 0 ? (((priceUnit - costUnit) / priceUnit) * 100).toFixed(1) : 0;
 
                   return (
                     <tr key={prodId} style={{ borderBottom: '1px solid #f1f5f9' }}>
@@ -294,8 +365,10 @@ const ProductsManager = () => {
                       </td>
                       <td style={styles.td}>
                         <div style={{ fontSize: '0.78rem' }}>
-                          <div>Costo: <strong>${cost.toFixed(2)}</strong></div>
-                          <div style={{ color: margin > 30 ? '#166534' : '#b45309', fontWeight: 'bold' }}>Margen: {margin}%</div>
+                          {p.allowByUnit && <div>• Un: <strong>${costUnit.toFixed(2)}</strong></div>}
+                          {p.cogsDozen > 0 && <div>• Doc: <strong>${parseFloat(p.cogsDozen).toFixed(2)}</strong></div>}
+                          {p.cogsKg > 0 && <div>• Kg: <strong>${parseFloat(p.cogsKg).toFixed(2)}</strong></div>}
+                          <div style={{ color: margin > 30 ? '#166534' : '#b45309', fontWeight: 'bold', marginTop: '2px' }}>Margen: {margin}%</div>
                         </div>
                       </td>
                       <td style={styles.td}>

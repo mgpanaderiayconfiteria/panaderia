@@ -127,6 +127,7 @@ const AdminPanel = () => {
     return map;
   }, [filteredSales]);
 
+  // Mapeo detallado de ventas por ítem individual
   const productSalesMap = useMemo(() => {
     const map = {};
     filteredSales.forEach((sale) => {
@@ -135,28 +136,69 @@ const AdminPanel = () => {
           const prodId = item.productId || item.product || item.id;
           const qty = parseFloat(item.quantityVal || item.quantity) || 0;
           const subtotal = parseFloat(item.subtotal || item.price * qty) || 0;
-          if (!map[prodId]) map[prodId] = { qty: 0, revenue: 0, name: item.name, mode: item.mode };
+
+          if (!map[prodId]) {
+            map[prodId] = { qty: 0, revenue: 0, name: item.name, mode: item.mode, itemsList: [] };
+          }
+
           map[prodId].qty += qty;
           map[prodId].revenue += subtotal;
+          map[prodId].itemsList.push(item);
         });
       }
     });
     return map;
   }, [filteredSales]);
 
+  // CÁLCULO DE RENTABILIDAD CON COSTOS ADAPTATIVOS
   const productsProfitability = useMemo(() => {
     return products.map((p) => {
       const prodId = p._id || p.id;
-      const realSales = productSalesMap[prodId] || { qty: 0, revenue: 0 };
+      const realSales = productSalesMap[prodId] || { qty: 0, revenue: 0, itemsList: [] };
       const unitsSold = realSales.qty;
       const revenue = realSales.revenue;
-      const unitCost = parseFloat(p.cogs || p.cost || 0);
 
-      const totalCogs = p.allowByWeight ? (unitsSold / 1000) * unitCost : unitsSold * unitCost;
+      // Extraer estructura de costos registrada en el producto
+      const cogsUnit = parseFloat(p.cogsUnit || p.cogs || 0);
+      const cogsHalfDozen = parseFloat(p.cogsHalfDozen || 0);
+      const cogsDozen = parseFloat(p.cogsDozen || 0);
+      const cogsKg = parseFloat(p.cogsKg || p.cogs || 0);
+
+      let totalCogs = 0;
+
+      if (realSales.itemsList && realSales.itemsList.length > 0) {
+        // Calcular costo exacto ítem por ítem en función de cómo se vendió
+        realSales.itemsList.forEach((item) => {
+          const q = parseFloat(item.quantityVal || item.quantity) || 0;
+          const mode = item.mode;
+
+          if (mode === 'weight' || p.allowByWeight) {
+            const costPerGram = cogsKg > 0 ? cogsKg / 1000 : cogsUnit / 1000;
+            totalCogs += q * costPerGram;
+          } else if (mode === 'unit_dozen' || p.allowByUnit) {
+            if (q === 12 && cogsDozen > 0) {
+              totalCogs += cogsDozen;
+            } else if (q === 6 && cogsHalfDozen > 0) {
+              totalCogs += cogsHalfDozen;
+            } else {
+              totalCogs += q * cogsUnit;
+            }
+          } else {
+            totalCogs += q * cogsUnit;
+          }
+        });
+      } else {
+        // Fallback por estimación si no hay ítems desglosados
+        if (p.allowByWeight) {
+          totalCogs = (unitsSold / 1000) * (cogsKg || cogsUnit);
+        } else {
+          totalCogs = unitsSold * cogsUnit;
+        }
+      }
+
       const netProfit = revenue - totalCogs;
-
       const priceUnit = parseFloat(p.priceUnit || p.priceKg || p.pricePorcion || p.price || 0);
-      const marginPct = priceUnit > 0 ? (((priceUnit - unitCost) / priceUnit) * 100).toFixed(1) : 0;
+      const marginPct = priceUnit > 0 && cogsUnit > 0 ? (((priceUnit - cogsUnit) / priceUnit) * 100).toFixed(1) : 0;
 
       return {
         ...p,
@@ -656,7 +698,7 @@ const AdminPanel = () => {
           <div style={styles.card}>
             <h2 style={styles.cardTitle}>RANKING DE PRODUCTOS QUE MÁS GANANCIA NETA DEJARON ($)</h2>
             <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '4px 0 10px 0' }}>
-              Ordenado automáticamente por el dinero líquido final generado tras restar el costo (COGS).
+              Ordenado automáticamente por el dinero líquido final generado tras restar el costo real derivado de la cantidad y modalidad vendida.
             </p>
             {productsProfitability.length === 0 ? (
               <p style={styles.emptyText}>No hay productos registrados en el catálogo.</p>
