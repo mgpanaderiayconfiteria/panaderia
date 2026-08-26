@@ -245,7 +245,7 @@ const NuevoCliente = () => {
           flex-direction: column;
           min-height: 100dvh;
           width: 100%;
-          background-color: #fef2f2;
+          background-color: #ffffff;
           box-sizing: border-box;
           position: relative;
           padding-bottom: ${cart.length > 0 && activeTab === 'catalog' ? '70px' : '0px'};
