@@ -7,10 +7,17 @@ import AnalyticsModal from '../components/AnalyticsModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-// Función auxiliar para obtener la fecha YYYY-MM-DD ajustada a la hora local argentina (UTC-3)
+// Función auxiliar para obtener la fecha YYYY-MM-DD ajustada a la hora local argentina con fallback seguro
 const getLocalDateString = (dateInput = new Date()) => {
   const d = new Date(dateInput);
-  return d.toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/BuenosAires' });
+  try {
+    return d.toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/BuenosAires' });
+  } catch (error) {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
 };
 
 const AdminPanel = () => {
@@ -20,10 +27,13 @@ const AdminPanel = () => {
   const [wasteLogs, setWasteLogs] = useState([]);
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
 
-  // Estado para controlar qué renglón de venta está desplegado
+  // Estado para controlar qué renglón individual de venta está desplegado
   const [expandedSaleId, setExpandedSaleId] = useState(null);
 
-  // Estado para filtrado por fecha específica (ajustado a zona horaria argentina)
+  // Estado para controlar la apertura general del contenedor de ventas
+  const [isAllSalesExpanded, setIsAllSalesExpanded] = useState(false);
+
+  // Estado para filtrado por fecha específica
   const [selectedDate, setSelectedDate] = useState(getLocalDateString());
 
   useEffect(() => {
@@ -439,175 +449,206 @@ const AdminPanel = () => {
             )}
           </div>
 
-          {/* ACORDEÓN DESPLEGABLE: TRANSACCIONES COMPACTAS */}
+          {/* CONTENEDOR AGRUPADO EN UN SOLO RENGLÓN */}
           <div style={{ ...styles.card, marginBottom: '20px' }}>
-            <h2 style={styles.cardTitle}>DETALLE DE VENTAS DE LA JORNADA ({selectedDate || 'Histórico'})</h2>
-            <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '4px 0 12px 0' }}>
-              Haga clic en un renglón para desplegar los artículos cobrados o anular la operación.
-            </p>
+            <div
+              onClick={() => setIsAllSalesExpanded(!isAllSalesExpanded)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                userSelect: 'none',
+                padding: '4px 0'
+              }}
+            >
+              <div>
+                <h2 style={{ ...styles.cardTitle, margin: 0 }}>
+                  DETALLE DE VENTAS DE LA JORNADA ({selectedDate || 'Histórico'})
+                </h2>
+                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                  Total de transacciones: <strong>{filteredSales.length}</strong>
+                </span>
+              </div>
 
-            {filteredSales.length === 0 ? (
-              <p style={styles.emptyText}>No hay ventas registradas para esta fecha.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {filteredSales.map((sale) => {
-                  const saleId = sale._id || sale.id;
-                  const isExpanded = expandedSaleId === saleId;
-                  const saleTime = new Date(sale.createdAt || sale.timestamp || Date.now()).toLocaleTimeString('es-AR', {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  });
-                  const hasDiscount = (sale.discountAmount || 0) > 0;
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#0284c7' }}>
+                  {isAllSalesExpanded ? 'Ocultar listado ▲' : 'Ver todas las ventas ▼'}
+                </span>
+              </div>
+            </div>
 
-                  return (
-                    <div
-                      key={saleId}
-                      style={{
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '6px',
-                        backgroundColor: isExpanded ? '#f8fafc' : '#ffffff',
-                        overflow: 'hidden',
-                        transition: 'background-color 0.15s ease'
-                      }}
-                    >
-                      {/* RENGLÓN PRINCIPAL COMPACTO */}
-                      <div
-                        onClick={() => toggleExpandSale(saleId)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justify: 'space-between',
-                          padding: '10px 14px',
-                          cursor: 'pointer',
-                          userSelect: 'none'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                          <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 'bold', minWidth: '55px' }}>
-                            {saleTime} hs
-                          </span>
-                          <span style={{ fontSize: '0.85rem', color: '#1e293b', fontWeight: '600' }}>
-                            👤 {sale.employee || sale.sellerName || sale.cashier || 'Caja General'}
-                          </span>
-                          <span
-                            style={{
-                              padding: '2px 8px',
-                              borderRadius: '4px',
-                              fontSize: '0.68rem',
-                              fontWeight: 'bold',
-                              backgroundColor: sale.paymentMethod === 'efectivo' ? '#dcfce7' : '#e0f2fe',
-                              color: sale.paymentMethod === 'efectivo' ? '#15803d' : '#0369a1'
-                            }}
-                          >
-                            {(sale.paymentMethod || 'EFECTIVO').toUpperCase()}
-                          </span>
+            {/* LISTADO DE VENTAS (SE MUESTRA SOLO SI ISALLSALESEXPANDED ES TRUE) */}
+            {isAllSalesExpanded && (
+              <div style={{ marginTop: '15px', borderTop: '1px solid #e2e8f0', paddingTop: '15px' }}>
+                <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '0 0 12px 0' }}>
+                  Haz clic en cada venta individual para ver sus artículos o anularla.
+                </p>
 
-                          {hasDiscount && (
-                            <span
-                              style={{
-                                padding: '2px 8px',
-                                borderRadius: '4px',
-                                fontSize: '0.68rem',
-                                fontWeight: 'bold',
-                                backgroundColor: '#f0fdf4',
-                                color: '#166534',
-                                border: '1px solid #bbf7d0'
-                              }}
-                            >
-                              🏷️ 10% OFF (-${sale.discountAmount.toFixed(2)})
-                            </span>
-                          )}
-                        </div>
+                {filteredSales.length === 0 ? (
+                  <p style={styles.emptyText}>No hay ventas registradas para esta fecha.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {filteredSales.map((sale) => {
+                      const saleId = sale._id || sale.id;
+                      const isExpanded = expandedSaleId === saleId;
+                      const saleTime = new Date(sale.createdAt || sale.timestamp || Date.now()).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      });
+                      const hasDiscount = (sale.discountAmount || 0) > 0;
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                          <strong style={{ fontSize: '0.9rem', color: '#166534' }}>
-                            ${parseFloat(sale.total || 0).toFixed(2)}
-                          </strong>
-                          <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                            {isExpanded ? '▲' : '▼'}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* DETALLE DESPLEGABLE */}
-                      {isExpanded && (
+                      return (
                         <div
+                          key={saleId}
                           style={{
-                            padding: '12px 14px',
-                            borderTop: '1px solid #f1f5f9',
-                            backgroundColor: '#ffffff'
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '6px',
+                            backgroundColor: isExpanded ? '#f8fafc' : '#ffffff',
+                            overflow: 'hidden',
+                            transition: 'background-color 0.15s ease'
                           }}
                         >
-                          <div style={{ fontSize: '0.75rem', color: '#475569', marginBottom: '8px', fontWeight: 'bold' }}>
-                            Productos cobrados:
+                          {/* RENGLÓN INDIVIDUAL */}
+                          <div
+                            onClick={() => toggleExpandSale(saleId)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '10px 14px',
+                              cursor: 'pointer',
+                              userSelect: 'none'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 'bold', minWidth: '55px' }}>
+                                {saleTime} hs
+                              </span>
+                              <span style={{ fontSize: '0.85rem', color: '#1e293b', fontWeight: '600' }}>
+                                👤 {sale.employee || sale.sellerName || sale.cashier || 'Caja General'}
+                              </span>
+                              <span
+                                style={{
+                                  padding: '2px 8px',
+                                  borderRadius: '4px',
+                                  fontSize: '0.68rem',
+                                  fontWeight: 'bold',
+                                  backgroundColor: sale.paymentMethod === 'efectivo' ? '#dcfce7' : '#e0f2fe',
+                                  color: sale.paymentMethod === 'efectivo' ? '#15803d' : '#0369a1'
+                                }}
+                              >
+                                {(sale.paymentMethod || 'EFECTIVO').toUpperCase()}
+                              </span>
+
+                              {hasDiscount && (
+                                <span
+                                  style={{
+                                    padding: '2px 8px',
+                                    borderRadius: '4px',
+                                    fontSize: '0.68rem',
+                                    fontWeight: 'bold',
+                                    backgroundColor: '#f0fdf4',
+                                    color: '#166534',
+                                    border: '1px solid #bbf7d0'
+                                  }}
+                                >
+                                  🏷️ 10% OFF (-${sale.discountAmount.toFixed(2)})
+                                </span>
+                              )}
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                              <strong style={{ fontSize: '0.9rem', color: '#166534' }}>
+                                ${parseFloat(sale.total || 0).toFixed(2)}
+                              </strong>
+                              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                                {isExpanded ? '▲' : '▼'}
+                              </span>
+                            </div>
                           </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '12px' }}>
-                            {Array.isArray(sale.items) && sale.items.length > 0 ? (
-                              sale.items.map((i, idx) => (
+
+                          {/* DETALLE INDIVIDUAL DE LA VENTA */}
+                          {isExpanded && (
+                            <div
+                              style={{
+                                padding: '12px 14px',
+                                borderTop: '1px solid #f1f5f9',
+                                backgroundColor: '#ffffff'
+                              }}
+                            >
+                              <div style={{ fontSize: '0.75rem', color: '#475569', marginBottom: '8px', fontWeight: 'bold' }}>
+                                Productos cobrados:
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '12px' }}>
+                                {Array.isArray(sale.items) && sale.items.length > 0 ? (
+                                  sale.items.map((i, idx) => (
+                                    <div
+                                      key={idx}
+                                      style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        fontSize: '0.78rem',
+                                        color: '#334155',
+                                        padding: '3px 0',
+                                        borderBottom: '1px dashed #f1f5f9'
+                                      }}
+                                    >
+                                      <span>
+                                        • {i.name} ({i.mode === 'weight' ? `${i.quantityVal || i.quantity}g` : `x${i.quantityVal || i.quantity}`})
+                                      </span>
+                                      <strong>${parseFloat(i.subtotal || (i.price * (i.quantityVal || i.quantity)) || 0).toFixed(2)}</strong>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Sin detalle de ítems (Venta rápida)</span>
+                                )}
+                              </div>
+
+                              {hasDiscount && (
                                 <div
-                                  key={idx}
                                   style={{
                                     display: 'flex',
                                     justifyContent: 'space-between',
                                     fontSize: '0.78rem',
-                                    color: '#334155',
-                                    padding: '3px 0',
-                                    borderBottom: '1px dashed #f1f5f9'
+                                    color: '#166534',
+                                    backgroundColor: '#f0fdf4',
+                                    padding: '6px 10px',
+                                    borderRadius: '4px',
+                                    marginBottom: '12px',
+                                    fontWeight: '600'
                                   }}
                                 >
-                                  <span>
-                                    • {i.name} ({i.mode === 'weight' ? `${i.quantityVal || i.quantity}g` : `x${i.quantityVal || i.quantity}`})
-                                  </span>
-                                  <strong>${parseFloat(i.subtotal || (i.price * (i.quantityVal || i.quantity)) || 0).toFixed(2)}</strong>
+                                  <span>Subtotal: ${sale.subtotal?.toFixed(2)}</span>
+                                  <span>Descuento Aplicado (10%): -${sale.discountAmount?.toFixed(2)}</span>
                                 </div>
-                              ))
-                            ) : (
-                              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Sin detalle de ítems (Venta rápida)</span>
-                            )}
-                          </div>
+                              )}
 
-                          {hasDiscount && (
-                            <div
-                              style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                fontSize: '0.78rem',
-                                color: '#166534',
-                                backgroundColor: '#f0fdf4',
-                                padding: '6px 10px',
-                                borderRadius: '4px',
-                                marginBottom: '12px',
-                                fontWeight: '600'
-                              }}
-                            >
-                              <span>Subtotal: ${sale.subtotal?.toFixed(2)}</span>
-                              <span>Descuento Aplicado (10%): -${sale.discountAmount?.toFixed(2)}</span>
+                              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                <button
+                                  onClick={(e) => handleDeleteSale(saleId, e)}
+                                  style={{
+                                    backgroundColor: '#fee2e2',
+                                    color: '#dc2626',
+                                    border: '1px solid #fca5a5',
+                                    padding: '5px 12px',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 'bold'
+                                  }}
+                                  title="Anular venta y devolver stock al catálogo"
+                                >
+                                  🗑️ Anular Orden y Restaurar Stock
+                                </button>
+                              </div>
                             </div>
                           )}
-
-                          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                            <button
-                              onClick={(e) => handleDeleteSale(saleId, e)}
-                              style={{
-                                backgroundColor: '#fee2e2',
-                                color: '#dc2626',
-                                border: '1px solid #fca5a5',
-                                padding: '5px 12px',
-                                borderRadius: '4px',
-                                cursor: 'pointer',
-                                fontSize: '0.75rem',
-                                fontWeight: 'bold'
-                              }}
-                              title="Anular venta y devolver stock al catálogo"
-                            >
-                              🗑️ Anular Orden y Restaurar Stock
-                            </button>
-                          </div>
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </div>
