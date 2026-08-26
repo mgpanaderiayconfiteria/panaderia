@@ -14,10 +14,12 @@ const AdminPanel = () => {
   const [wasteLogs, setWasteLogs] = useState([]);
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
 
+  // Estado para controlar qué renglón de venta está desplegado
+  const [expandedSaleId, setExpandedSaleId] = useState(null);
+
   // Estado para filtrado por fecha específica
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
-  // Cargar registros de desperdicio/mermas desde el servidor
   useEffect(() => {
     fetch(`${API_URL}/api/shifts/waste`)
       .then((res) => (res.ok ? res.json() : []))
@@ -25,8 +27,12 @@ const AdminPanel = () => {
       .catch((err) => console.error('Error al cargar mermas:', err));
   }, []);
 
-  // Manejador para anular/eliminar venta repetida
-  const handleDeleteSale = async (saleId) => {
+  const toggleExpandSale = (id) => {
+    setExpandedSaleId((prev) => (prev === id ? null : id));
+  };
+
+  const handleDeleteSale = async (saleId, e) => {
+    e.stopPropagation(); // Evitar que el clic en anular despliegue/cierre el renglón
     const confirmDelete = window.confirm(
       '¿Estás seguro de eliminar esta venta? El dinero se descontará de la caja y el stock de los productos será restaurado automáticamente.'
     );
@@ -35,14 +41,13 @@ const AdminPanel = () => {
 
     const result = await deleteSale(saleId);
     if (result.success) {
-      if (fetchProducts) fetchProducts(); // Refrescar catálogo para ver el stock restaurado
+      if (fetchProducts) fetchProducts();
       alert('Venta anulada y stock devuelto exitosamente.');
     } else {
       alert(`Error al eliminar la venta: ${result.message || 'Intente nuevamente'}`);
     }
   };
 
-  // Filtrado de ventas según la fecha elegida
   const filteredSales = useMemo(() => {
     if (!selectedDate) return sales;
     return sales.filter((sale) => {
@@ -53,12 +58,10 @@ const AdminPanel = () => {
     });
   }, [sales, selectedDate]);
 
-  // 1. Total Ingresos Totales
   const totalEarnings = useMemo(() => {
     return filteredSales.reduce((acc, sale) => acc + (parseFloat(sale.total) || 0), 0);
   }, [filteredSales]);
 
-  // 2. Ventas por Turno (Mañana: 06:00 a 13:59 | Tarde: 14:00 a 22:00)
   const shiftTotals = useMemo(() => {
     let morning = 0;
     let afternoon = 0;
@@ -72,7 +75,6 @@ const AdminPanel = () => {
     return { morning, afternoon };
   }, [filteredSales]);
 
-  // 3. Ventas por Vendedor (Agrupado por Empleado)
   const salesBySeller = useMemo(() => {
     const map = {};
     filteredSales.forEach((sale) => {
@@ -92,7 +94,6 @@ const AdminPanel = () => {
     return map;
   }, [filteredSales]);
 
-  // 4. Mapeo de Ventas por Producto
   const productSalesMap = useMemo(() => {
     const map = {};
     filteredSales.forEach((sale) => {
@@ -110,7 +111,6 @@ const AdminPanel = () => {
     return map;
   }, [filteredSales]);
 
-  // 5. Lista de productos con Análisis de Ganancia Neta ($) adaptado a Peso / Unidades
   const productsProfitability = useMemo(() => {
     return products.map((p) => {
       const prodId = p._id || p.id;
@@ -119,7 +119,6 @@ const AdminPanel = () => {
       const revenue = realSales.revenue;
       const unitCost = parseFloat(p.cogs || p.cost || 0);
 
-      // Si el producto se vende por peso, los gramos vendidos se convierten a Kilos para calcular el COGS
       const totalCogs = p.allowByWeight ? (unitsSold / 1000) * unitCost : unitsSold * unitCost;
       const netProfit = revenue - totalCogs;
 
@@ -137,26 +136,22 @@ const AdminPanel = () => {
     }).sort((a, b) => b.netProfit - a.netProfit);
   }, [products, productSalesMap]);
 
-  // Total Ganancia Neta General del Día
   const totalNetProfit = useMemo(() => {
     return productsProfitability.reduce((acc, p) => acc + p.netProfit, 0);
   }, [productsProfitability]);
 
-  // Top 5 Productos más vendidos por volumen
   const topProductsList = useMemo(() => {
     return Object.values(productSalesMap)
       .sort((a, b) => b.qty - a.qty)
       .slice(0, 5);
   }, [productSalesMap]);
 
-  // Pérdida total por desperdicio
   const totalWasteLoss = useMemo(() => {
     return wasteLogs.reduce((acc, log) => acc + (parseFloat(log.totalLoss) || 0), 0);
   }, [wasteLogs]);
 
   return (
     <div style={styles.dashboardContainer}>
-      {/* MODAL DE GRÁFICOS Y ANALÍTICA */}
       <AnalyticsModal 
         isOpen={showAnalyticsModal}
         onClose={() => setShowAnalyticsModal(false)}
@@ -193,10 +188,7 @@ const AdminPanel = () => {
           </span>
         </div>
         <div style={styles.navRight}>
-          <button 
-            onClick={() => setShowAnalyticsModal(true)} 
-            style={styles.btnAnalytics}
-          >
+          <button onClick={() => setShowAnalyticsModal(true)} style={styles.btnAnalytics}>
             📈 Gráficos & Analytics
           </button>
           <div style={styles.userProfile}>
@@ -218,7 +210,6 @@ const AdminPanel = () => {
         </main>
       )}
 
-      {/* PESTAÑA LOG DE SOBRANTES DE FIN DE TURNO */}
       {activeTab === 'waste' && (
         <main style={styles.mainContent}>
           <div style={styles.headerRow}>
@@ -267,13 +258,10 @@ const AdminPanel = () => {
         </main>
       )}
 
-      {/* DASHBOARD PRINCIPAL */}
       {activeTab === 'dashboard' && (
         <main style={styles.mainContent}>
           <div style={styles.headerRow}>
             <h1 style={styles.pageTitle}>PANEL DE CONTROL MG PANADERÍA</h1>
-            
-            {/* SELECTOR DE FECHA HISTÓRICO */}
             <div style={styles.dateSelector}>
               <span style={styles.dateButton}>📅 Consultar Día:</span>
               <input
@@ -292,7 +280,6 @@ const AdminPanel = () => {
           </div>
 
           <div style={styles.topGrid}>
-            {/* CARD 1: VENTAS Y GANANCIA NETA DEL DÍA */}
             <div style={styles.card}>
               <div style={styles.cardHeader}>
                 <h2 style={styles.cardTitle}>RESUMEN DE CAJA Y GANANCIA NETAS</h2>
@@ -322,7 +309,6 @@ const AdminPanel = () => {
               </div>
             </div>
 
-            {/* CARD 2: PRODUCTOS MÁS VENDIDOS */}
             <div style={styles.card}>
               <h2 style={styles.cardTitle}>PRODUCTOS MÁS VENDIDOS (CANTIDAD)</h2>
               <div style={styles.donutGrid}>
@@ -347,7 +333,6 @@ const AdminPanel = () => {
               </div>
             </div>
 
-            {/* CARD 3: ALERTAS DE STOCK Y DESPERDICIO */}
             <div style={styles.card}>
               <h2 style={styles.cardTitle}>ALERTAS DE STOCK Y DESPERDICIO</h2>
               <div style={styles.sidebarSection}>
@@ -393,7 +378,6 @@ const AdminPanel = () => {
             </div>
           </div>
 
-          {/* TABLA: AUDITORÍA DE CAJERA / EMPLEADO */}
           <div style={{ ...styles.card, marginBottom: '20px' }}>
             <h2 style={styles.cardTitle}>VENTAS AUDITADAS POR VENDEDOR / CAJERA ({selectedDate || 'Histórico'})</h2>
             {Object.keys(salesBySeller).length === 0 ? (
@@ -424,85 +408,143 @@ const AdminPanel = () => {
             )}
           </div>
 
-          {/* NUEVA TABLA: DETALLE DE TRANSACCIONES Y ANULACIÓN DE VENTAS */}
+          {/* ACORDEÓN DESPLEGABLE: TRANSACCIONES COMPACTAS */}
           <div style={{ ...styles.card, marginBottom: '20px' }}>
             <h2 style={styles.cardTitle}>DETALLE DE VENTAS DE LA JORNADA ({selectedDate || 'Histórico'})</h2>
-            <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '4px 0 10px 0' }}>
-              Utilice el botón de anular para corregir cobros duplicados o cargados por error por el personal de caja.
+            <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '4px 0 12px 0' }}>
+              Haga clic en un renglón para desplegar los artículos cobrados o anular la operación.
             </p>
+
             {filteredSales.length === 0 ? (
               <p style={styles.emptyText}>No hay ventas registradas para esta fecha.</p>
             ) : (
-              <table style={styles.table}>
-                <thead>
-                  <tr style={styles.trHead}>
-                    <th style={styles.th}>Hora</th>
-                    <th style={styles.th}>Cajera / Vendedor</th>
-                    <th style={styles.th}>Items / Productos</th>
-                    <th style={styles.th}>Método Pago</th>
-                    <th style={styles.th}>Total Vendido</th>
-                    <th style={{ ...styles.th, textAlign: 'center' }}>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredSales.map((sale) => {
-                    const saleId = sale._id || sale.id;
-                    const saleTime = new Date(sale.createdAt || sale.timestamp || Date.now()).toLocaleTimeString('es-AR', {
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    });
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {filteredSales.map((sale) => {
+                  const saleId = sale._id || sale.id;
+                  const isExpanded = expandedSaleId === saleId;
+                  const saleTime = new Date(sale.createdAt || sale.timestamp || Date.now()).toLocaleTimeString('es-AR', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  });
 
-                    return (
-                      <tr key={saleId} style={styles.trBody}>
-                        <td style={styles.td}>{saleTime} hs</td>
-                        <td style={styles.td}><strong>👤 {sale.employee || sale.sellerName || sale.cashier || 'Caja General'}</strong></td>
-                        <td style={styles.td}>
-                          {Array.isArray(sale.items) && sale.items.length > 0
-                            ? sale.items.map((i) => `${i.name} (${i.mode === 'weight' ? `${i.quantityVal || i.quantity}g` : `x${i.quantityVal || i.quantity}`})`).join(', ')
-                            : 'Venta rápida'}
-                        </td>
-                        <td style={styles.td}>
-                          <span style={{
-                            padding: '2px 8px',
-                            borderRadius: '4px',
-                            fontSize: '0.7rem',
-                            fontWeight: 'bold',
-                            backgroundColor: sale.paymentMethod === 'efectivo' ? '#dcfce7' : '#e0f2fe',
-                            color: sale.paymentMethod === 'efectivo' ? '#15803d' : '#0369a1'
-                          }}>
-                            {sale.paymentMethod ? sale.paymentMethod.toUpperCase() : 'EFECTIVO'}
+                  return (
+                    <div
+                      key={saleId}
+                      style={{
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '6px',
+                        backgroundColor: isExpanded ? '#f8fafc' : '#ffffff',
+                        overflow: 'hidden',
+                        transition: 'background-color 0.15s ease'
+                      }}
+                    >
+                      {/* RENGLÓN PRINCIPAL COMPACTO */}
+                      <div
+                        onClick={() => toggleExpandSale(saleId)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justify: 'space-between',
+                          padding: '10px 14px',
+                          cursor: 'pointer',
+                          userSelect: 'none'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                          <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 'bold', minWidth: '55px' }}>
+                            {saleTime} hs
                           </span>
-                        </td>
-                        <td style={{ ...styles.td, color: '#166534', fontWeight: 'bold' }}>
-                          ${parseFloat(sale.total || 0).toFixed(2)}
-                        </td>
-                        <td style={{ ...styles.td, textAlign: 'center' }}>
-                          <button
-                            onClick={() => handleDeleteSale(saleId)}
+                          <span style={{ fontSize: '0.85rem', color: '#1e293b', fontWeight: '600' }}>
+                            👤 {sale.employee || sale.sellerName || sale.cashier || 'Caja General'}
+                          </span>
+                          <span
                             style={{
-                              backgroundColor: '#fee2e2',
-                              color: '#dc2626',
-                              border: '1px solid #fca5a5',
-                              padding: '4px 10px',
+                              padding: '2px 8px',
                               borderRadius: '4px',
-                              cursor: 'pointer',
-                              fontSize: '0.75rem',
-                              fontWeight: 'bold'
+                              fontSize: '0.68rem',
+                              fontWeight: 'bold',
+                              backgroundColor: sale.paymentMethod === 'efectivo' ? '#dcfce7' : '#e0f2fe',
+                              color: sale.paymentMethod === 'efectivo' ? '#15803d' : '#0369a1'
                             }}
-                            title="Anular venta y restaurar stock"
                           >
-                            🗑️ Anular
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                            {(sale.paymentMethod || 'EFECTIVO').toUpperCase()}
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                          <strong style={{ fontSize: '0.9rem', color: '#166534' }}>
+                            ${parseFloat(sale.total || 0).toFixed(2)}
+                          </strong>
+                          <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                            {isExpanded ? '▲' : '▼'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* DETALLE DESPLEGABLE */}
+                      {isExpanded && (
+                        <div
+                          style={{
+                            padding: '12px 14px',
+                            borderTop: '1px solid #f1f5f9',
+                            backgroundColor: '#ffffff'
+                          }}
+                        >
+                          <div style={{ fontSize: '0.75rem', color: '#475569', marginBottom: '8px', fontWeight: 'bold' }}>
+                            Productos cobrados:
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '12px' }}>
+                            {Array.isArray(sale.items) && sale.items.length > 0 ? (
+                              sale.items.map((i, idx) => (
+                                <div
+                                  key={idx}
+                                  style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    fontSize: '0.78rem',
+                                    color: '#334155',
+                                    padding: '3px 0',
+                                    borderBottom: '1px dashed #f1f5f9'
+                                  }}
+                                >
+                                  <span>
+                                    • {i.name} ({i.mode === 'weight' ? `${i.quantityVal || i.quantity}g` : `x${i.quantityVal || i.quantity}`})
+                                  </span>
+                                  <strong>${parseFloat(i.subtotal || (i.price * (i.quantityVal || i.quantity)) || 0).toFixed(2)}</strong>
+                                </div>
+                              ))
+                            ) : (
+                              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Sin detalle de ítems (Venta rápida)</span>
+                            )}
+                          </div>
+
+                          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <button
+                              onClick={(e) => handleDeleteSale(saleId, e)}
+                              style={{
+                                backgroundColor: '#fee2e2',
+                                color: '#dc2626',
+                                border: '1px solid #fca5a5',
+                                padding: '5px 12px',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '0.75rem',
+                                fontWeight: 'bold'
+                              }}
+                              title="Anular venta y devolver stock al catálogo"
+                            >
+                              🗑️ Anular Orden y Restaurar Stock
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
 
-          {/* TABLA DE RENTABILIDAD ORDENADA POR GANANCIA NETA ($) */}
           <div style={styles.card}>
             <h2 style={styles.cardTitle}>RANKING DE PRODUCTOS QUE MÁS GANANCIA NETA DEJARON ($)</h2>
             <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '4px 0 10px 0' }}>
