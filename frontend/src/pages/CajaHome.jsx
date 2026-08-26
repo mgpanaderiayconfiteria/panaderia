@@ -9,7 +9,6 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const CajaHome = () => {
   const navigate = useNavigate();
-  // Se obtiene la función clearSales o resetSales para limpiar las ventas en memoria
   const { sales, clearSales, setSales } = useContext(SaleContext);
   const { user, logout } = useContext(AuthContext);
   const { products, fetchProducts, addProduct } = useContext(ProductContext);
@@ -155,7 +154,6 @@ const CajaHome = () => {
 
     alert(`Turno cerrado exitosamente.\n\nEfectivo Esperado: $${efectivoEsperadoEnCaja.toFixed(2)}\nEfectivo Real: $${efectivoRealNum.toFixed(2)}\nDiferencia: $${diferenciaCaja.toFixed(2)}`);
     
-    // CORRECCIÓN: Limpia las ventas del turno en memoria y elimina datos locales del turno
     if (typeof clearSales === 'function') {
       clearSales();
     } else if (typeof setSales === 'function') {
@@ -166,7 +164,6 @@ const CajaHome = () => {
     localStorage.removeItem('mg_current_shift_sales');
     setShowCierreModal(false);
 
-    // Ejecuta deslogueo y manda a la pantalla de entrada
     if (logout) logout();
     navigate('/login');
   };
@@ -182,7 +179,7 @@ const CajaHome = () => {
           min-height: 100dvh;
           padding: 12px;
           box-sizing: border-box;
-          background-color: #f8fafc;
+          background-color: #fef2f2;
         }
 
         .top-info-bar {
@@ -190,15 +187,14 @@ const CajaHome = () => {
           flex-wrap: wrap;
           gap: 8px 16px;
           align-items: center;
-          justify-content: center;
-          background-color: #ffffff;
-          padding: 8px 14px;
+          justify-content: space-around;
+          background-color: #dc2626;
+          padding: 12px 18px;
           border-radius: 20px;
-          border: 1px solid #cbd5e1;
-          font-size: 0.85rem;
-          color: #334155;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-          margin-bottom: 16px;
+          font-size: 0.95rem;
+          color: #ffffff;
+          box-shadow: 0 4px 6px rgba(220, 38, 38, 0.2);
+          margin-bottom: 20px;
           width: 100%;
           max-width: 800px;
           box-sizing: border-box;
@@ -207,7 +203,7 @@ const CajaHome = () => {
         .buttons-grid {
           display: grid;
           grid-template-columns: repeat(2, 1fr);
-          gap: 12px;
+          gap: 14px;
           width: 100%;
           max-width: 800px;
           justify-items: center;
@@ -223,20 +219,21 @@ const CajaHome = () => {
 
         .btn-circle {
           width: 100%;
-          max-width: 120px;
+          max-width: 130px;
           aspect-ratio: 1 / 1;
-          border-radius: 50%;
+          border-radius: 20px;
           border: none;
           color: #ffffff;
           font-weight: bold;
-          font-size: clamp(0.75rem, 2.8vw, 1rem);
+          font-size: clamp(0.8rem, 3vw, 1rem);
           cursor: pointer;
-          box-shadow: 0px 4px 10px rgba(0,0,0,0.12);
+          box-shadow: 0px 4px 12px rgba(185, 28, 28, 0.25);
           display: flex;
+          flex-direction: column;
           align-items: center;
           justify-content: center;
           text-align: center;
-          padding: 8px;
+          padding: 10px;
           transition: transform 0.2s ease, box-shadow 0.2s ease;
           user-select: none;
         }
@@ -245,12 +242,17 @@ const CajaHome = () => {
           transform: scale(0.95);
         }
 
-        .btn-green { background-color: #2e7d32; }
-        .btn-blue { background-color: #0284c7; }
-        .btn-orange { background-color: #ea580c; }
-        .btn-sky { background-color: #0369a1; }
-        .btn-yellow { background-color: #d97706; }
-        .btn-red { background-color: #c62828; }
+        /* Degradado cromático en tonos de rojo inspirados en el diseño */
+        .btn-main-red { background: linear-gradient(135deg, #ff0000 0%, #cc0000 100%); grid-column: span 2; max-width: 100%; aspect-ratio: auto; min-height: 100px; font-size: 1.4rem; }
+        .btn-red-1 { background-color: #ef4444; }
+        .btn-red-2 { background-color: #e11d48; }
+        .btn-red-3 { background-color: #9f1239; }
+        .btn-red-4 { background-color: #f87171; }
+        .btn-red-5 { background-color: #be123c; }
+
+        @media (min-width: 600px) {
+          .btn-main-red { grid-column: span 3; }
+        }
 
         .modal-card {
           background-color: #ffffff;
@@ -263,19 +265,20 @@ const CajaHome = () => {
           display: flex;
           flex-direction: column;
           gap: 12px;
-          box-shadow: 0 20px 25px -5px rgba(0,0,0,0.25);
+          box-shadow: 0 20px 25px -5px rgba(153, 27, 27, 0.3);
           box-sizing: border-box;
+          border-top: 5px solid #dc2626;
         }
 
         .modal-content-large {
-          background-color: #f8fafc;
+          background-color: #ffffff;
           width: 95%;
           max-width: 1100px;
           height: 90dvh;
           border-radius: 16px;
           display: flex;
           flex-direction: column;
-          box-shadow: 0 20px 25px -5px rgba(0,0,0,0.25);
+          box-shadow: 0 20px 25px -5px rgba(153, 27, 27, 0.3);
           overflow: hidden;
         }
       `}</style>
@@ -287,30 +290,30 @@ const CajaHome = () => {
         <button onClick={() => setShowAperturaModal(true)} style={styles.btnLinkEdit}>Ajustar Fondo</button>
       </div>
 
-      {/* BOTONES PRINCIPALES */}
+      {/* BOTONES PRINCIPALES EN TONOS ROJOS */}
       <div className="buttons-grid">
-        <button className="btn-circle btn-green" onClick={() => navigate('/nuevo-cliente')}>
-          + Nuevo cliente
+        <button className="btn-circle btn-main-red" onClick={() => navigate('/nuevo-cliente')}>
+          <span>Nuevo Cliente +</span>
         </button>
 
-        <button className="btn-circle btn-blue" onClick={() => setShowCatalog(true)}>
-          📦 Ver Stock / Precios
+        <button className="btn-circle btn-red-1" onClick={() => setShowCatalog(true)}>
+          📋 Ver Stock
         </button>
 
-        <button className="btn-circle btn-orange" onClick={() => setShowWasteModal(true)}>
-          🗑️ Registrar Sobrante
+        <button className="btn-circle btn-red-2" onClick={() => setShowWasteModal(true)}>
+          📉 Cargar Sobrantes
         </button>
 
-        <button className="btn-circle btn-sky" onClick={() => setShowQuickProdModal(true)}>
-          📥 Alta Proveedor
+        <button className="btn-circle btn-red-3" onClick={() => setShowQuickProdModal(true)}>
+          🚚 Alta Proveedores
         </button>
 
-        <button className="btn-circle btn-yellow" onClick={() => navigate('/ultimos-movimientos')}>
-          Últimos movimientos
+        <button className="btn-circle btn-red-4" onClick={() => navigate('/ultimos-movimientos')}>
+          📑 Últimos Movimientos
         </button>
 
-        <button className="btn-circle btn-red" onClick={() => setShowCierreModal(true)}>
-          Cerrar turno
+        <button className="btn-circle btn-red-5" onClick={() => setShowCierreModal(true)}>
+          ✖ Cerrar Turno
         </button>
       </div>
 
@@ -319,9 +322,9 @@ const CajaHome = () => {
         <div style={styles.modalOverlay}>
           <div className="modal-card">
             <div style={styles.modalHeader}>
-              <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>💵 APERTURA DE CAJA</h3>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#991b1b' }}>💵 APERTURA DE CAJA</h3>
             </div>
-            <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>
+            <p style={{ fontSize: '0.85rem', color: '#7f1d1d', margin: 0 }}>
               Ingrese el monto en efectivo disponible en la caja al iniciar el turno.
             </p>
             <input
@@ -332,7 +335,7 @@ const CajaHome = () => {
               style={styles.inputForm}
               autoFocus
             />
-            <button onClick={handleConfirmApertura} style={styles.btnConfirmarVerde}>
+            <button onClick={handleConfirmApertura} style={styles.btnConfirmarRojo}>
               CONFIRMAR FONDO INICIAL
             </button>
           </div>
@@ -344,7 +347,7 @@ const CajaHome = () => {
         <div style={styles.modalOverlay}>
           <div className="modal-content-large">
             <div style={styles.modalHeader}>
-              <h2 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>CONSULTA DE STOCK Y PRECIOS</h2>
+              <h2 style={{ margin: 0, fontSize: '1.1rem', color: '#991b1b' }}>CONSULTA DE STOCK Y PRECIOS</h2>
               <button onClick={() => setShowCatalog(false)} style={styles.btnCloseModal}>✕ Cerrar</button>
             </div>
             <div style={styles.modalBody}><StockCatalog /></div>
@@ -357,10 +360,10 @@ const CajaHome = () => {
         <div style={styles.modalOverlay}>
           <div className="modal-card">
             <div style={styles.modalHeader}>
-              <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>🗑️ REGISTRAR SOBRANTE / MERMA</h3>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#991b1b' }}>🗑️ REGISTRAR SOBRANTE / MERMA</h3>
               <button onClick={() => setShowWasteModal(false)} style={styles.btnCloseModal}>✕</button>
             </div>
-            <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>
+            <p style={{ fontSize: '0.85rem', color: '#7f1d1d', margin: 0 }}>
               Seleccione el producto de panadería que sobró para descontarlo del stock y reportarlo.
             </p>
             <select
@@ -394,7 +397,7 @@ const CajaHome = () => {
         <div style={styles.modalOverlay}>
           <div className="modal-card">
             <div style={styles.modalHeader}>
-              <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>📦 RECEPCIÓN EXPRÉS PROVEEDOR</h3>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#991b1b' }}>📦 RECEPCIÓN EXPRÉS PROVEEDOR</h3>
               <button onClick={() => setShowQuickProdModal(false)} style={styles.btnCloseModal}>✕</button>
             </div>
 
@@ -457,7 +460,7 @@ const CajaHome = () => {
               style={styles.inputForm}
             />
 
-            <button onClick={handleQuickAddProduct} style={styles.btnConfirmarAzul}>
+            <button onClick={handleQuickAddProduct} style={styles.btnConfirmarRojo}>
               INGRESAR PRODUCTO AL STOCK
             </button>
           </div>
@@ -469,7 +472,7 @@ const CajaHome = () => {
         <div style={styles.modalOverlay}>
           <div className="modal-card">
             <div style={styles.modalHeader}>
-              <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a' }}>🔒 ARQUEO Y CIERRE DE TURNO</h3>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#991b1b' }}>🔒 ARQUEO Y CIERRE DE TURNO</h3>
               <button onClick={() => setShowCierreModal(false)} style={styles.btnCloseModal}>✕</button>
             </div>
 
@@ -484,22 +487,22 @@ const CajaHome = () => {
               </div>
               <div style={styles.resumenRow}>
                 <span>Ventas en Efectivo:</span>
-                <strong style={{ color: '#166534' }}>+ ${totalEfectivoVentas.toFixed(2)}</strong>
+                <strong style={{ color: '#991b1b' }}>+ ${totalEfectivoVentas.toFixed(2)}</strong>
               </div>
               <div style={styles.resumenRow}>
                 <span>Cobros Digitales:</span>
-                <strong style={{ color: '#0284c7' }}>${totalDigital.toFixed(2)}</strong>
+                <strong style={{ color: '#be123c' }}>${totalDigital.toFixed(2)}</strong>
               </div>
 
-              <hr style={{ border: 'none', borderTop: '1px solid #cbd5e1', margin: '4px 0' }} />
+              <hr style={{ border: 'none', borderTop: '1px solid #fca5a5', margin: '4px 0' }} />
 
-              <div style={{ ...styles.resumenRow, backgroundColor: '#f0fdf4', padding: '6px 8px', borderRadius: '6px' }}>
-                <span style={{ fontWeight: 'bold', color: '#166534' }}>EFECTIVO ESPERADO EN CAJA:</span>
-                <strong style={{ fontSize: '1rem', color: '#166534' }}>${efectivoEsperadoEnCaja.toFixed(2)}</strong>
+              <div style={{ ...styles.resumenRow, backgroundColor: '#fef2f2', padding: '6px 8px', borderRadius: '6px' }}>
+                <span style={{ fontWeight: 'bold', color: '#991b1b' }}>EFECTIVO ESPERADO EN CAJA:</span>
+                <strong style={{ fontSize: '1rem', color: '#991b1b' }}>${efectivoEsperadoEnCaja.toFixed(2)}</strong>
               </div>
 
               <div style={{ marginTop: '6px' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#334155', display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#7f1d1d', display: 'block', marginBottom: '4px' }}>
                   💵 Efectivo Real Contado en Caja ($):
                 </label>
                 <input
@@ -507,7 +510,7 @@ const CajaHome = () => {
                   placeholder="Ej. 12500"
                   value={actualCashInput}
                   onChange={(e) => setActualCashInput(e.target.value)}
-                  style={{ ...styles.inputForm, border: '2px solid #0284c7', fontSize: '1rem', fontWeight: 'bold' }}
+                  style={{ ...styles.inputForm, border: '2px solid #dc2626', fontSize: '1rem', fontWeight: 'bold' }}
                 />
               </div>
 
@@ -518,18 +521,18 @@ const CajaHome = () => {
                   fontSize: '0.8rem',
                   fontWeight: 'bold',
                   textAlign: 'center',
-                  backgroundColor: diferenciaCaja === 0 ? '#f0fdf4' : diferenciaCaja > 0 ? '#eff6ff' : '#fef2f2',
-                  color: diferenciaCaja === 0 ? '#166534' : diferenciaCaja > 0 ? '#1d4ed8' : '#dc2626',
-                  border: `1px solid ${diferenciaCaja === 0 ? '#bbf7d0' : diferenciaCaja > 0 ? '#bfdbfe' : '#fecaca'}`
+                  backgroundColor: diferenciaCaja === 0 ? '#fef2f2' : diferenciaCaja > 0 ? '#fff1f2' : '#fef2f2',
+                  color: diferenciaCaja === 0 ? '#991b1b' : diferenciaCaja > 0 ? '#be123c' : '#dc2626',
+                  border: `1px solid ${diferenciaCaja === 0 ? '#fca5a5' : diferenciaCaja > 0 ? '#fecdd3' : '#fecaca'}`
                 }}>
                   {diferenciaCaja === 0 && '✅ Caja Cuadrada Perfecta'}
-                  {diferenciaCaja > 0 && `🔵 Sobrante en Caja: +$${diferenciaCaja.toFixed(2)}`}
+                  {diferenciaCaja > 0 && `🔴 Sobrante en Caja: +$${diferenciaCaja.toFixed(2)}`}
                   {diferenciaCaja < 0 && `⚠️ Faltante en Caja: -$${Math.abs(diferenciaCaja).toFixed(2)}`}
                 </div>
               )}
             </div>
 
-            <button onClick={handleFinalizarTurno} style={styles.btnConfirmarCierre}>
+            <button onClick={handleFinalizarTurno} style={styles.btnConfirmarRojo}>
               CONFIRMAR Y FINALIZAR TURNO
             </button>
           </div>
@@ -540,17 +543,14 @@ const CajaHome = () => {
 };
 
 const styles = {
-  btnLinkEdit: { background: 'none', border: 'none', color: '#0284c7', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.8rem', padding: 0 },
-  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.65)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '12px' },
-  modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '6px', borderBottom: '1px solid #e2e8f0' },
-  btnCloseModal: { backgroundColor: '#e2e8f0', color: '#334155', border: 'none', padding: '6px 10px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.8rem' },
+  btnLinkEdit: { background: 'none', border: 'none', color: '#ffffff', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.85rem', padding: 0, fontWeight: 'bold' },
+  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(127, 29, 29, 0.65)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '12px' },
+  modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '6px', borderBottom: '1px solid #fca5a5' },
+  btnCloseModal: { backgroundColor: '#fecaca', color: '#991b1b', border: 'none', padding: '6px 10px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.8rem' },
   modalBody: { padding: '10px', overflowY: 'auto', flex: 1 },
-  resumenRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem', color: '#334155' },
-  inputForm: { padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem', width: '100%', boxSizing: 'border-box' },
-  btnConfirmarVerde: { width: '100%', padding: '10px', backgroundColor: '#15803d', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.9rem', cursor: 'pointer' },
-  btnConfirmarRojo: { width: '100%', padding: '10px', backgroundColor: '#dc2626', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.9rem', cursor: 'pointer' },
-  btnConfirmarAzul: { width: '100%', padding: '10px', backgroundColor: '#0284c7', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.9rem', cursor: 'pointer' },
-  btnConfirmarCierre: { width: '100%', padding: '12px', backgroundColor: '#c62828', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.95rem', cursor: 'pointer' }
+  resumenRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem', color: '#7f1d1d' },
+  inputForm: { padding: '8px 10px', borderRadius: '8px', border: '1px solid #fca5a5', fontSize: '0.9rem', width: '100%', boxSizing: 'border-box' },
+  btnConfirmarRojo: { width: '100%', padding: '12px', backgroundColor: '#dc2626', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.95rem', cursor: 'pointer' }
 };
 
 export default CajaHome;
