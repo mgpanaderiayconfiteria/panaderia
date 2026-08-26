@@ -117,10 +117,9 @@ const NuevoCliente = () => {
       const val = parseFloat(quantity);
       detailLabel = `${val} porc`;
     } else if (sellMode === 'amount') {
-      const amountVal = parseFloat(quantity); // Ej: $1500 pesos
+      const amountVal = parseFloat(quantity); 
       
       if (basePriceKg > 0) {
-        // CONVERSIÓN DE DINERO A GRAMOS REALES: (Monto / PrecioKg) * 1000
         finalQtyGrams = Math.round((amountVal / basePriceKg) * 1000);
         finalMode = 'weight';
         detailLabel = `$${amountVal} (${finalQtyGrams}g / ${(finalQtyGrams / 1000).toFixed(2)} kg)`;
@@ -150,7 +149,6 @@ const NuevoCliente = () => {
   const totalCart = useMemo(() => cart.reduce((acc, item) => acc + item.subtotal, 0), [cart]);
   const totalItemsCount = useMemo(() => cart.length, [cart]);
 
-  // Lógica del descuento de efectivo (10%)
   const cashDiscountAmount = useMemo(() => {
     return isCashDiscountActive ? totalCart * 0.10 : 0;
   }, [isCashDiscountActive, totalCart]);
@@ -245,7 +243,7 @@ const NuevoCliente = () => {
           flex-direction: column;
           min-height: 100dvh;
           width: 100%;
-          background-color: #ffffff;
+          background-color: transparent; /* Fondo transparente aplicado */
           box-sizing: border-box;
           position: relative;
           padding-bottom: ${cart.length > 0 && activeTab === 'catalog' ? '70px' : '0px'};
@@ -544,7 +542,7 @@ const NuevoCliente = () => {
                 {sellMode === 'weight' && 'Ingrese gramos (ej: 250):'}
                 {sellMode === 'unit' && 'Ingrese cantidad de unidades:'}
                 {sellMode === 'portion' && 'Ingrese cantidad de porciones:'}
-                {sellMode === 'amount' && 'Ingrese monto exacto en $:'}
+                {sellMode === 'amount' && 'Ingrese monto exacto in $:'}
               </label>
               <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="0" autoFocus style={styles.touchInput} />
             </div>
