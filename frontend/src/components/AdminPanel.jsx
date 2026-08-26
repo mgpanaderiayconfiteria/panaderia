@@ -8,8 +8,8 @@ import AnalyticsModal from '../components/AnalyticsModal';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const AdminPanel = () => {
-  const { products } = useContext(ProductContext);
-  const { sales } = useContext(SaleContext);
+  const { products, fetchProducts } = useContext(ProductContext);
+  const { sales, deleteSale } = useContext(SaleContext);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [wasteLogs, setWasteLogs] = useState([]);
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
@@ -24,6 +24,23 @@ const AdminPanel = () => {
       .then((data) => setWasteLogs(data))
       .catch((err) => console.error('Error al cargar mermas:', err));
   }, []);
+
+  // Manejador para anular/eliminar venta repetida
+  const handleDeleteSale = async (saleId) => {
+    const confirmDelete = window.confirm(
+      '¿Estás seguro de eliminar esta venta? El dinero se descontará de la caja y el stock de los productos será restaurado automáticamente.'
+    );
+
+    if (!confirmDelete) return;
+
+    const result = await deleteSale(saleId);
+    if (result.success) {
+      if (fetchProducts) fetchProducts(); // Refrescar catálogo para ver el stock restaurado
+      alert('Venta anulada y stock devuelto exitosamente.');
+    } else {
+      alert(`Error al eliminar la venta: ${result.message || 'Intente nuevamente'}`);
+    }
+  };
 
   // Filtrado de ventas según la fecha elegida
   const filteredSales = useMemo(() => {
@@ -330,14 +347,14 @@ const AdminPanel = () => {
               </div>
             </div>
 
-            {/* CARD 3: ALERTAS DE STOCK Y DESPERDICIO (DINÁMICO POR UNIDAD / PESO) */}
+            {/* CARD 3: ALERTAS DE STOCK Y DESPERDICIO */}
             <div style={styles.card}>
               <h2 style={styles.cardTitle}>ALERTAS DE STOCK Y DESPERDICIO</h2>
               <div style={styles.sidebarSection}>
                 {(() => {
                   const lowStockProducts = products.filter((p) => {
-                    if (p.allowByWeight) return (p.stockGrams || p.stock || 0) <= 2000; // Menos de 2kg
-                    return (p.stockUnits || p.stock || 0) <= 5; // Menos de 5 unidades/porciones
+                    if (p.allowByWeight) return (p.stockGrams || p.stock || 0) <= 2000;
+                    return (p.stockUnits || p.stock || 0) <= 5;
                   });
 
                   if (lowStockProducts.length === 0 && wasteLogs.length === 0) {
@@ -346,7 +363,6 @@ const AdminPanel = () => {
 
                   return (
                     <>
-                      {/* Alerta agrupada de Stock Bajo */}
                       {lowStockProducts.length > 0 && (
                         <div style={{ ...styles.badgeGray, backgroundColor: '#fff7ed', border: '1px solid #ffedd5' }}>
                           ⚠️ <strong style={{ color: '#c2410c' }}>{lowStockProducts.length} productos con stock bajo:</strong>
@@ -365,7 +381,6 @@ const AdminPanel = () => {
                         </div>
                       )}
 
-                      {/* Alerta agrupada de Mermas */}
                       {wasteLogs.length > 0 && (
                         <div style={{ ...styles.badgeGray, backgroundColor: '#fef2f2', border: '1px solid #fecaca', marginTop: '10px' }}>
                           🗑️ <strong style={{ color: '#991b1b' }}>{wasteLogs.length} mermas registradas</strong>
@@ -404,6 +419,84 @@ const AdminPanel = () => {
                       <td style={{ ...styles.td, color: '#166534', fontWeight: 'bold' }}>${data.total.toFixed(2)}</td>
                     </tr>
                   ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* NUEVA TABLA: DETALLE DE TRANSACCIONES Y ANULACIÓN DE VENTAS */}
+          <div style={{ ...styles.card, marginBottom: '20px' }}>
+            <h2 style={styles.cardTitle}>DETALLE DE VENTAS DE LA JORNADA ({selectedDate || 'Histórico'})</h2>
+            <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '4px 0 10px 0' }}>
+              Utilice el botón de anular para corregir cobros duplicados o cargados por error por el personal de caja.
+            </p>
+            {filteredSales.length === 0 ? (
+              <p style={styles.emptyText}>No hay ventas registradas para esta fecha.</p>
+            ) : (
+              <table style={styles.table}>
+                <thead>
+                  <tr style={styles.trHead}>
+                    <th style={styles.th}>Hora</th>
+                    <th style={styles.th}>Cajera / Vendedor</th>
+                    <th style={styles.th}>Items / Productos</th>
+                    <th style={styles.th}>Método Pago</th>
+                    <th style={styles.th}>Total Vendido</th>
+                    <th style={{ ...styles.th, textAlign: 'center' }}>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredSales.map((sale) => {
+                    const saleId = sale._id || sale.id;
+                    const saleTime = new Date(sale.createdAt || sale.timestamp || Date.now()).toLocaleTimeString('es-AR', {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    });
+
+                    return (
+                      <tr key={saleId} style={styles.trBody}>
+                        <td style={styles.td}>{saleTime} hs</td>
+                        <td style={styles.td}><strong>👤 {sale.employee || sale.sellerName || sale.cashier || 'Caja General'}</strong></td>
+                        <td style={styles.td}>
+                          {Array.isArray(sale.items) && sale.items.length > 0
+                            ? sale.items.map((i) => `${i.name} (${i.mode === 'weight' ? `${i.quantityVal || i.quantity}g` : `x${i.quantityVal || i.quantity}`})`).join(', ')
+                            : 'Venta rápida'}
+                        </td>
+                        <td style={styles.td}>
+                          <span style={{
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            fontSize: '0.7rem',
+                            fontWeight: 'bold',
+                            backgroundColor: sale.paymentMethod === 'efectivo' ? '#dcfce7' : '#e0f2fe',
+                            color: sale.paymentMethod === 'efectivo' ? '#15803d' : '#0369a1'
+                          }}>
+                            {sale.paymentMethod ? sale.paymentMethod.toUpperCase() : 'EFECTIVO'}
+                          </span>
+                        </td>
+                        <td style={{ ...styles.td, color: '#166534', fontWeight: 'bold' }}>
+                          ${parseFloat(sale.total || 0).toFixed(2)}
+                        </td>
+                        <td style={{ ...styles.td, textAlign: 'center' }}>
+                          <button
+                            onClick={() => handleDeleteSale(saleId)}
+                            style={{
+                              backgroundColor: '#fee2e2',
+                              color: '#dc2626',
+                              border: '1px solid #fca5a5',
+                              padding: '4px 10px',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '0.75rem',
+                              fontWeight: 'bold'
+                            }}
+                            title="Anular venta y restaurar stock"
+                          >
+                            🗑️ Anular
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}

@@ -101,8 +101,42 @@ export const SaleProvider = ({ children }) => {
     }
   };
 
+  // Función para eliminar/anular una venta y actualizar el estado local
+  const deleteSale = async (saleId) => {
+    try {
+      const storedUser = JSON.parse(localStorage.getItem('mg_user'));
+      const token = storedUser?.token;
+
+      // Si es una venta temporal de contingencia (local), la borramos directo del estado
+      if (saleId.toString().startsWith('SALE-LOCAL-')) {
+        setSales((prevSales) => prevSales.filter((s) => (s._id || s.id) !== saleId));
+        return { success: true };
+      }
+
+      const response = await fetch(`${API_URL}/api/orders/${saleId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
+      });
+
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(errJson.message || 'Error al eliminar la orden en el servidor');
+      }
+
+      // Remover del estado local la venta eliminada
+      setSales((prevSales) => prevSales.filter((s) => (s._id || s.id) !== saleId));
+      return { success: true };
+    } catch (error) {
+      console.error('Error al eliminar venta:', error);
+      return { success: false, message: error.message };
+    }
+  };
+
   return (
-    <SaleContext.Provider value={{ sales, addSale, fetchSales, loading }}>
+    <SaleContext.Provider value={{ sales, addSale, deleteSale, fetchSales, loading }}>
       {children}
     </SaleContext.Provider>
   );

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { createOrder, getOrders } = require('../controllers/orderController');
+const { createOrder, getOrders, deleteOrder } = require('../controllers/orderController'); // <--- Importamos deleteOrder
 
 // Intentar cargar middleware de autenticación con fallback seguro
 let protect = (req, res, next) => next();
@@ -21,5 +21,6 @@ try {
 
 router.post('/', protect, createOrder);
 router.get('/', protect, getOrders);
+router.delete('/:id', protect, deleteOrder); // <--- Nueva ruta DELETE
 
 module.exports = router;

@@ -1,4 +1,5 @@
 const Order = require('../models/Order');
+const Product = require('../models/Product'); // Requerimos el modelo de Producto para actualizar stock
 const mongoose = require('mongoose');
 
 // @desc    Crear un nuevo pedido
@@ -68,7 +69,54 @@ const getOrders = async (req, res) => {
   }
 };
 
+// @desc    Eliminar una orden y restaurar stock
+// @route   DELETE /api/orders/:id
+// @access  Private / Admin
+const deleteOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'ID de orden no válido' });
+    }
+
+    const order = await Order.findById(id);
+    if (!order) {
+      return res.status(404).json({ message: 'Orden no encontrada' });
+    }
+
+    // Revertir el stock de cada ítem en el inventario
+    if (Array.isArray(order.items)) {
+      for (const item of order.items) {
+        if (item.product && mongoose.Types.ObjectId.isValid(item.product)) {
+          const product = await Product.findById(item.product);
+          if (product) {
+            const qty = parseFloat(item.quantity) || 0;
+            
+            if (product.allowByWeight) {
+              product.stockGrams = (product.stockGrams || 0) + qty;
+            } else {
+              product.stockUnits = (product.stockUnits || 0) + qty;
+            }
+            product.stock = (product.stock || 0) + qty;
+            
+            await product.save();
+          }
+        }
+      }
+    }
+
+    await Order.findByIdAndDelete(id);
+    console.log('🗑️ Orden eliminada y stock devuelto:', id);
+    res.json({ message: 'Orden eliminada y stock devuelto con éxito', deletedId: id });
+  } catch (error) {
+    console.error('❌ Error al eliminar orden:', error);
+    res.status(500).json({ message: 'Error interno al eliminar el pedido', error: error.message });
+  }
+};
+
 module.exports = {
   createOrder,
-  getOrders
+  getOrders,
+  deleteOrder
 };
