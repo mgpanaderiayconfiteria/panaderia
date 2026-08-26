@@ -93,9 +93,13 @@ const NuevoCliente = () => {
   const handleAddToCart = () => {
     if (!selectedProduct || calculatedSubtotal <= 0) return;
     let detailLabel = '';
-    const val = parseFloat(quantity);
+    let finalQtyGrams = parseFloat(quantity);
+    let finalMode = sellMode;
+
+    const basePriceKg = parseFloat(selectedProduct.priceKg || selectedProduct.price || 0);
 
     if (sellMode === 'unit') {
+      const val = parseFloat(quantity);
       const priceHalf = parseFloat(selectedProduct.priceHalfDozen || 0);
       const priceDozen = parseFloat(selectedProduct.priceDozen || 0);
 
@@ -106,10 +110,24 @@ const NuevoCliente = () => {
       } else {
         detailLabel = `${val} un`;
       }
+    } else if (sellMode === 'weight') {
+      const val = parseFloat(quantity);
+      detailLabel = `${val} gr (${(val / 1000).toFixed(2)} kg)`;
+    } else if (sellMode === 'portion') {
+      const val = parseFloat(quantity);
+      detailLabel = `${val} porc`;
+    } else if (sellMode === 'amount') {
+      const amountVal = parseFloat(quantity); // Ej: $1500 pesos
+      
+      if (basePriceKg > 0) {
+        // CONVERSIÓN DE DINERO A GRAMOS REALES: (Monto / PrecioKg) * 1000
+        finalQtyGrams = Math.round((amountVal / basePriceKg) * 1000);
+        finalMode = 'weight';
+        detailLabel = `$${amountVal} (${finalQtyGrams}g / ${(finalQtyGrams / 1000).toFixed(2)} kg)`;
+      } else {
+        detailLabel = `Monto libre ($${amountVal})`;
+      }
     }
-    if (sellMode === 'weight') detailLabel = `${val} gr (${(val / 1000).toFixed(2)} kg)`;
-    if (sellMode === 'portion') detailLabel = `${val} porc`;
-    if (sellMode === 'amount') detailLabel = `Monto libre ($${val})`;
 
     const cartItem = {
       id: Date.now(),
@@ -117,9 +135,9 @@ const NuevoCliente = () => {
       name: selectedProduct.name,
       category: selectedProduct.category || 'General',
       subcategory: selectedProduct.subcategory || '',
-      mode: sellMode,
-      quantityVal: val,
-      unitPrice: calculatedSubtotal / (val || 1),
+      mode: finalMode,
+      quantityVal: finalQtyGrams,
+      unitPrice: calculatedSubtotal / (finalQtyGrams || 1),
       detailLabel,
       subtotal: calculatedSubtotal
     };
