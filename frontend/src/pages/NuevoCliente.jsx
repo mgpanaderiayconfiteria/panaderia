@@ -7,7 +7,7 @@ import { AuthContext } from '../context/AuthContext';
 const NuevoCliente = () => {
   const navigate = useNavigate();
   const { products } = useContext(ProductContext);
-  const { addSale } = useContext(SaleContext);
+  const { addSale, isCashDiscountActive } = useContext(SaleContext);
   const { user } = useContext(AuthContext);
 
   // Extracción dinámica de categorías de los productos cargados
@@ -28,6 +28,7 @@ const NuevoCliente = () => {
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [paymentStep, setPaymentStep] = useState('select_method');
   const [cashGiven, setCashGiven] = useState('');
+  const [digitalGiven, setDigitalGiven] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -130,15 +131,29 @@ const NuevoCliente = () => {
 
   const totalCart = useMemo(() => cart.reduce((acc, item) => acc + item.subtotal, 0), [cart]);
   const totalItemsCount = useMemo(() => cart.length, [cart]);
-  
-  const changeAmount = useMemo(() => {
+
+  // Lógica del descuento de efectivo (10%)
+  const cashDiscountAmount = useMemo(() => {
+    return isCashDiscountActive ? totalCart * 0.10 : 0;
+  }, [isCashDiscountActive, totalCart]);
+
+  const finalCashTotal = useMemo(() => {
+    return totalCart - cashDiscountAmount;
+  }, [totalCart, cashDiscountAmount]);
+
+  const changeCashAmount = useMemo(() => {
     const given = parseFloat(cashGiven) || 0;
+    return given >= finalCashTotal ? given - finalCashTotal : 0;
+  }, [cashGiven, finalCashTotal]);
+
+  const changeDigitalAmount = useMemo(() => {
+    const given = parseFloat(digitalGiven) || 0;
     return given >= totalCart ? given - totalCart : 0;
-  }, [cashGiven, totalCart]);
+  }, [digitalGiven, totalCart]);
 
   const handleConfirmCashSale = async () => {
     const given = parseFloat(cashGiven) || 0;
-    if (given < totalCart) return;
+    if (given < finalCashTotal) return;
 
     setIsSubmitting(true);
     try {
@@ -150,15 +165,51 @@ const NuevoCliente = () => {
         items: cart,
         paymentMethod: 'efectivo',
         subtotal: totalCart,
-        total: totalCart,
+        discountAmount: cashDiscountAmount,
+        total: finalCashTotal,
         paidAmount: given,
-        changeAmount: changeAmount,
+        changeAmount: changeCashAmount,
         timestamp: new Date().toISOString()
       });
 
       setShowCheckoutModal(false);
       setCart([]);
       setCashGiven('');
+      setDigitalGiven('');
+      setPaymentStep('select_method');
+      navigate('/caja');
+    } catch (e) {
+      alert('Error al procesar la venta.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleConfirmDigitalSale = async () => {
+    const given = parseFloat(digitalGiven) || 0;
+    if (given < totalCart) return;
+
+    setIsSubmitting(true);
+    try {
+      await addSale({
+        sellerId: user?._id || user?.id,
+        sellerName: user?.name || user?.email || 'Empleado Caja',
+        sellerRole: user?.role || 'cajero',
+        cashier: user?.name || user?.email || 'Empleado Caja',
+        items: cart,
+        paymentMethod: 'digital',
+        subtotal: totalCart,
+        discountAmount: 0,
+        total: totalCart,
+        paidAmount: given,
+        changeAmount: changeDigitalAmount,
+        timestamp: new Date().toISOString()
+      });
+
+      setShowCheckoutModal(false);
+      setCart([]);
+      setCashGiven('');
+      setDigitalGiven('');
       setPaymentStep('select_method');
       navigate('/caja');
     } catch (e) {
@@ -405,16 +456,27 @@ const NuevoCliente = () => {
           {cart.length > 0 && (
             <div style={styles.cartSummaryFooter}>
               <div style={styles.totalRow}>
-                <span>TOTAL A PAGAR:</span>
+                <span>TOTAL ESTIMADO:</span>
                 <strong style={{ fontSize: '1.6rem', color: '#dc2626' }}>${totalCart.toFixed(2)}</strong>
               </div>
+
+              {isCashDiscountActive && (
+                <div style={{ backgroundColor: '#f0fdf4', padding: '8px 12px', borderRadius: '6px', border: '1px solid #bbf7d0', fontSize: '0.8rem', color: '#166534', fontWeight: '600' }}>
+                  ⚡ Descuento del 10% en efectivo disponible en el momento del pago.
+                </div>
+              )}
 
               <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
                 <button onClick={() => setActiveTab('catalog')} style={{ ...styles.btnAgregarMas, flex: 1, padding: '12px' }}>
                   ← Volver al catálogo
                 </button>
                 <button
-                  onClick={() => { setShowCheckoutModal(true); setPaymentStep('select_method'); }}
+                  onClick={() => { 
+                    setShowCheckoutModal(true); 
+                    setPaymentStep('select_method');
+                    setCashGiven('');
+                    setDigitalGiven('');
+                  }}
                   style={styles.btnPagarMain}
                 >
                   PROCEDER AL PAGO ➔
@@ -491,25 +553,50 @@ const NuevoCliente = () => {
             {paymentStep === 'select_method' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div style={{ textAlign: 'center', margin: '10px 0' }}>
-                  <span style={{ fontSize: '0.9rem', color: '#991b1b' }}>TOTAL A COBRAR</span>
+                  <span style={{ fontSize: '0.9rem', color: '#991b1b' }}>TOTAL SUBTOTAL</span>
                   <h1 style={{ margin: 0, fontSize: '2.2rem', color: '#dc2626' }}>${totalCart.toFixed(2)}</h1>
                 </div>
 
-                <button onClick={() => setPaymentStep('cash_details')} style={styles.btnMethodCash}>
-                  💵 PAGO EN EFECTIVO
+                <button 
+                  onClick={() => {
+                    setCashGiven(finalCashTotal.toString());
+                    setPaymentStep('cash_details');
+                  }} 
+                  style={styles.btnMethodCash}
+                >
+                  💵 PAGO EN EFECTIVO {isCashDiscountActive && '(10% OFF)'}
                 </button>
 
-                <button onClick={() => setPaymentStep('digital_standby')} style={styles.btnMethodDigital}>
-                  💳 PAGO DIGITAL
+                <button 
+                  onClick={() => {
+                    setDigitalGiven(totalCart.toString());
+                    setPaymentStep('digital_details');
+                  }} 
+                  style={styles.btnMethodDigital}
+                >
+                  💳 PAGO DIGITAL (SIN DESCUENTO)
                 </button>
               </div>
             )}
 
+            {/* DETALLES DE PAGO EN EFECTIVO */}
             {paymentStep === 'cash_details' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div style={styles.summaryBox}>
-                  <span>Total a Pagar:</span>
+                  <span>Subtotal:</span>
                   <strong>${totalCart.toFixed(2)}</strong>
+                </div>
+
+                {isCashDiscountActive && (
+                  <div style={{ ...styles.summaryBox, backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534' }}>
+                    <span>Descuento Efectivo (10%):</span>
+                    <strong>-${cashDiscountAmount.toFixed(2)}</strong>
+                  </div>
+                )}
+
+                <div style={{ ...styles.summaryBox, backgroundColor: '#fef2f2', border: '2px solid #dc2626' }}>
+                  <span style={{ fontWeight: 'bold' }}>TOTAL CON DESCUENTO:</span>
+                  <strong style={{ fontSize: '1.3rem', color: '#dc2626' }}>${finalCashTotal.toFixed(2)}</strong>
                 </div>
 
                 <div style={styles.inputGroup}>
@@ -526,7 +613,7 @@ const NuevoCliente = () => {
                 </div>
 
                 <div style={styles.quickPresetsRow}>
-                  <button onClick={() => setCashGiven(totalCart.toString())} style={styles.presetBtn} disabled={isSubmitting}>Monto Exacto</button>
+                  <button onClick={() => setCashGiven(finalCashTotal.toString())} style={styles.presetBtn} disabled={isSubmitting}>Monto Exacto</button>
                   <button onClick={() => setCashGiven('1000')} style={styles.presetBtn} disabled={isSubmitting}>$1.000</button>
                   <button onClick={() => setCashGiven('2000')} style={styles.presetBtn} disabled={isSubmitting}>$2.000</button>
                   <button onClick={() => setCashGiven('5000')} style={styles.presetBtn} disabled={isSubmitting}>$5.000</button>
@@ -535,8 +622,8 @@ const NuevoCliente = () => {
 
                 <div style={{ ...styles.subtotalDisplay, backgroundColor: '#fef2f2' }}>
                   <span style={{ fontSize: '1.1rem' }}>VUELTO:</span>
-                  <strong style={{ fontSize: '1.8rem', color: (parseFloat(cashGiven) || 0) < totalCart ? '#991b1b' : '#dc2626' }}>
-                    ${changeAmount.toFixed(2)}
+                  <strong style={{ fontSize: '1.8rem', color: (parseFloat(cashGiven) || 0) < finalCashTotal ? '#991b1b' : '#dc2626' }}>
+                    ${changeCashAmount.toFixed(2)}
                   </strong>
                 </div>
 
@@ -546,12 +633,12 @@ const NuevoCliente = () => {
                   </button>
                   <button
                     onClick={handleConfirmCashSale}
-                    disabled={(parseFloat(cashGiven) || 0) < totalCart || isSubmitting}
+                    disabled={(parseFloat(cashGiven) || 0) < finalCashTotal || isSubmitting}
                     style={{
                       ...styles.btnAddCart,
                       flex: 2,
-                      backgroundColor: ((parseFloat(cashGiven) || 0) < totalCart || isSubmitting) ? '#fca5a5' : '#dc2626',
-                      cursor: ((parseFloat(cashGiven) || 0) < totalCart || isSubmitting) ? 'not-allowed' : 'pointer'
+                      backgroundColor: ((parseFloat(cashGiven) || 0) < finalCashTotal || isSubmitting) ? '#fca5a5' : '#dc2626',
+                      cursor: ((parseFloat(cashGiven) || 0) < finalCashTotal || isSubmitting) ? 'not-allowed' : 'pointer'
                     }}
                   >
                     {isSubmitting ? 'PROCESANDO...' : 'CONFIRMAR Y REGISTRAR'}
@@ -560,16 +647,61 @@ const NuevoCliente = () => {
               </div>
             )}
 
-            {paymentStep === 'digital_standby' && (
-              <div style={{ textAlign: 'center', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{ fontSize: '3rem' }}>⌛</div>
-                <h3 style={{ margin: 0, color: '#7f1d1d' }}>PAGO DIGITAL EN STANDBY</h3>
-                <p style={{ fontSize: '0.85rem', color: '#991b1b', margin: 0 }}>
-                  El módulo de integración de pagos digitales (Mercado Pago / POSNET) se encuentra en desarrollo.
-                </p>
-                <button onClick={() => setPaymentStep('select_method')} style={{ ...styles.btnVolver, width: '100%' }}>
-                  ← Seleccionar otro medio de pago
-                </button>
+            {/* DETALLES DE PAGO DIGITAL */}
+            {paymentStep === 'digital_details' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div style={{ ...styles.summaryBox, backgroundColor: '#eff6ff', border: '2px solid #2563eb' }}>
+                  <span style={{ fontWeight: 'bold', color: '#1e40af' }}>TOTAL A TRANSFERIR / PAGAR:</span>
+                  <strong style={{ fontSize: '1.3rem', color: '#2563eb' }}>${totalCart.toFixed(2)}</strong>
+                </div>
+
+                <div style={styles.inputGroup}>
+                  <label style={styles.inputLabel}>Monto transferido / abonado ($):</label>
+                  <input
+                    type="number"
+                    value={digitalGiven}
+                    onChange={(e) => setDigitalGiven(e.target.value)}
+                    placeholder="Monto recibido digitalmente"
+                    autoFocus
+                    style={{ ...styles.touchInput, borderColor: '#2563eb' }}
+                    disabled={isSubmitting}
+                  />
+                </div>
+
+                <div style={styles.quickPresetsRow}>
+                  <button onClick={() => setDigitalGiven(totalCart.toString())} style={styles.presetBtn} disabled={isSubmitting}>Monto Exacto</button>
+                  <button onClick={() => setDigitalGiven('1000')} style={styles.presetBtn} disabled={isSubmitting}>$1.000</button>
+                  <button onClick={() => setDigitalGiven('2000')} style={styles.presetBtn} disabled={isSubmitting}>$2.000</button>
+                  <button onClick={() => setDigitalGiven('5000')} style={styles.presetBtn} disabled={isSubmitting}>$5.000</button>
+                  <button onClick={() => setDigitalGiven('10000')} style={styles.presetBtn} disabled={isSubmitting}>$10.000</button>
+                </div>
+
+                {changeDigitalAmount > 0 && (
+                  <div style={{ ...styles.subtotalDisplay, backgroundColor: '#eff6ff' }}>
+                    <span style={{ fontSize: '0.9rem', color: '#1e40af' }}>DIFERENCIA / SALDO:</span>
+                    <strong style={{ fontSize: '1.4rem', color: '#2563eb' }}>
+                      ${changeDigitalAmount.toFixed(2)}
+                    </strong>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button onClick={() => setPaymentStep('select_method')} style={{ ...styles.btnVolver, flex: 1 }} disabled={isSubmitting}>
+                    Volver
+                  </button>
+                  <button
+                    onClick={handleConfirmDigitalSale}
+                    disabled={(parseFloat(digitalGiven) || 0) < totalCart || isSubmitting}
+                    style={{
+                      ...styles.btnAddCart,
+                      flex: 2,
+                      backgroundColor: ((parseFloat(digitalGiven) || 0) < totalCart || isSubmitting) ? '#93c5fd' : '#2563eb',
+                      cursor: ((parseFloat(digitalGiven) || 0) < totalCart || isSubmitting) ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {isSubmitting ? 'PROCESANDO...' : 'CONFIRMAR VENTA DIGITAL'}
+                  </button>
+                </div>
               </div>
             )}
 
@@ -614,7 +746,7 @@ const styles = {
   subtotalDisplay: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: '8px', border: '1px solid #fca5a5', backgroundColor: '#fef2f2' },
   btnAddCart: { width: '100%', padding: '12px', borderRadius: '8px', color: '#fff', fontWeight: 'bold', fontSize: '0.95rem', border: 'none' },
   btnMethodCash: { padding: '14px', backgroundColor: '#dc2626', color: '#fff', fontWeight: 'bold', fontSize: '1rem', borderRadius: '10px', border: 'none', cursor: 'pointer' },
-  btnMethodDigital: { padding: '14px', backgroundColor: '#991b1b', color: '#fff', fontWeight: 'bold', fontSize: '1rem', borderRadius: '10px', border: 'none', cursor: 'pointer' },
+  btnMethodDigital: { padding: '14px', backgroundColor: '#2563eb', color: '#fff', fontWeight: 'bold', fontSize: '1rem', borderRadius: '10px', border: 'none', cursor: 'pointer' },
   summaryBox: { display: 'flex', justifyContent: 'space-between', backgroundColor: '#fef2f2', padding: '10px', borderRadius: '8px', fontSize: '1rem', border: '1px solid #fca5a5' }
 };
 

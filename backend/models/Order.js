@@ -10,7 +10,8 @@ const orderSchema = new mongoose.Schema({
     detailLabel: { type: String }
   }],
   subtotal: { type: Number, required: true },
-  discount: { type: Number, default: 0 },
+  discountAmount: { type: Number, default: 0 }, // Monto en $ descontado por promo
+  isCashDiscountApplied: { type: Boolean, default: false }, // Flag del botón del dueño
   total: { type: Number, required: true },
   paidAmount: { type: Number },
   changeAmount: { type: Number, default: 0 },

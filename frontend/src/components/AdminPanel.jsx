@@ -7,6 +7,12 @@ import AnalyticsModal from '../components/AnalyticsModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
+// Función auxiliar para obtener la fecha YYYY-MM-DD ajustada a la hora local argentina (UTC-3)
+const getLocalDateString = (dateInput = new Date()) => {
+  const d = new Date(dateInput);
+  return d.toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/BuenosAires' });
+};
+
 const AdminPanel = () => {
   const { products, fetchProducts } = useContext(ProductContext);
   const { sales, deleteSale } = useContext(SaleContext);
@@ -17,8 +23,8 @@ const AdminPanel = () => {
   // Estado para controlar qué renglón de venta está desplegado
   const [expandedSaleId, setExpandedSaleId] = useState(null);
 
-  // Estado para filtrado por fecha específica
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  // Estado para filtrado por fecha específica (ajustado a zona horaria argentina)
+  const [selectedDate, setSelectedDate] = useState(getLocalDateString());
 
   useEffect(() => {
     fetch(`${API_URL}/api/shifts/waste`)
@@ -51,15 +57,28 @@ const AdminPanel = () => {
   const filteredSales = useMemo(() => {
     if (!selectedDate) return sales;
     return sales.filter((sale) => {
-      const saleDateStr = new Date(sale.createdAt || sale.timestamp || Date.now())
-        .toISOString()
-        .split('T')[0];
+      const saleDateStr = getLocalDateString(sale.createdAt || sale.timestamp || Date.now());
       return saleDateStr === selectedDate;
     });
   }, [sales, selectedDate]);
 
-  const totalEarnings = useMemo(() => {
-    return filteredSales.reduce((acc, sale) => acc + (parseFloat(sale.total) || 0), 0);
+  // Cálculos consolidados de facturación, descuentos e ingreso neto de caja
+  const totalsSummary = useMemo(() => {
+    let grossTotal = 0;
+    let totalDiscounts = 0;
+    let netTotal = 0;
+
+    filteredSales.forEach((sale) => {
+      const saleSubtotal = parseFloat(sale.subtotal) || parseFloat(sale.total) || 0;
+      const discount = parseFloat(sale.discountAmount) || 0;
+      const finalTotal = parseFloat(sale.total) || 0;
+
+      grossTotal += saleSubtotal;
+      totalDiscounts += discount;
+      netTotal += finalTotal;
+    });
+
+    return { grossTotal, totalDiscounts, netTotal };
   }, [filteredSales]);
 
   const shiftTotals = useMemo(() => {
@@ -80,11 +99,15 @@ const AdminPanel = () => {
     filteredSales.forEach((sale) => {
       const sellerName = sale.employee || sale.sellerName || sale.cashier || 'Caja General';
       const amount = parseFloat(sale.total) || 0;
+      const discount = parseFloat(sale.discountAmount) || 0;
+
       if (!map[sellerName]) {
-        map[sellerName] = { total: 0, count: 0, cash: 0, digital: 0 };
+        map[sellerName] = { total: 0, count: 0, cash: 0, digital: 0, discounts: 0 };
       }
       map[sellerName].total += amount;
       map[sellerName].count += 1;
+      map[sellerName].discounts += discount;
+
       if (sale.paymentMethod === 'efectivo') {
         map[sellerName].cash += amount;
       } else {
@@ -271,7 +294,7 @@ const AdminPanel = () => {
                 style={styles.dateInput}
               />
               <button 
-                onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])} 
+                onClick={() => setSelectedDate(getLocalDateString())} 
                 style={styles.btnResetDate}
               >
                 Hoy
@@ -286,8 +309,12 @@ const AdminPanel = () => {
               </div>
               <div style={styles.kpiRow}>
                 <div style={styles.kpiBox}>
-                  <div style={styles.kpiLabel}>Facturación Bruta</div>
-                  <div style={styles.kpiValueBlue}>${totalEarnings.toFixed(2)}</div>
+                  <div style={styles.kpiLabel}>Total Cobrado Real</div>
+                  <div style={styles.kpiValueBlue}>${totalsSummary.netTotal.toFixed(2)}</div>
+                </div>
+                <div style={{ ...styles.kpiBox, backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }}>
+                  <div style={{ ...styles.kpiLabel, color: '#166534' }}>Descuentos Oto. (10%)</div>
+                  <div style={{ ...styles.kpiValueGreen, color: '#15803d' }}>-${totalsSummary.totalDiscounts.toFixed(2)}</div>
                 </div>
                 <div style={styles.kpiBox}>
                   <div style={styles.kpiLabel}>Ganancia Neta Real</div>
@@ -390,6 +417,7 @@ const AdminPanel = () => {
                     <th style={styles.th}>Cant. Órdenes</th>
                     <th style={styles.th}>Efectivo Recaudado</th>
                     <th style={styles.th}>Cobros Digitales</th>
+                    <th style={styles.th}>Descuentos Otorgados</th>
                     <th style={styles.th}>Total Vendido</th>
                   </tr>
                 </thead>
@@ -400,6 +428,9 @@ const AdminPanel = () => {
                       <td style={styles.td}>{data.count} vtas</td>
                       <td style={styles.td}>${data.cash.toFixed(2)}</td>
                       <td style={styles.td}>${data.digital.toFixed(2)}</td>
+                      <td style={{ ...styles.td, color: '#166534', fontWeight: 'bold' }}>
+                        -${data.discounts.toFixed(2)}
+                      </td>
                       <td style={{ ...styles.td, color: '#166534', fontWeight: 'bold' }}>${data.total.toFixed(2)}</td>
                     </tr>
                   ))}
@@ -426,6 +457,7 @@ const AdminPanel = () => {
                     hour: '2-digit',
                     minute: '2-digit'
                   });
+                  const hasDiscount = (sale.discountAmount || 0) > 0;
 
                   return (
                     <div
@@ -469,6 +501,22 @@ const AdminPanel = () => {
                           >
                             {(sale.paymentMethod || 'EFECTIVO').toUpperCase()}
                           </span>
+
+                          {hasDiscount && (
+                            <span
+                              style={{
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                fontSize: '0.68rem',
+                                fontWeight: 'bold',
+                                backgroundColor: '#f0fdf4',
+                                color: '#166534',
+                                border: '1px solid #bbf7d0'
+                              }}
+                            >
+                              🏷️ 10% OFF (-${sale.discountAmount.toFixed(2)})
+                            </span>
+                          )}
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -517,6 +565,25 @@ const AdminPanel = () => {
                               <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Sin detalle de ítems (Venta rápida)</span>
                             )}
                           </div>
+
+                          {hasDiscount && (
+                            <div
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                fontSize: '0.78rem',
+                                color: '#166534',
+                                backgroundColor: '#f0fdf4',
+                                padding: '6px 10px',
+                                borderRadius: '4px',
+                                marginBottom: '12px',
+                                fontWeight: '600'
+                              }}
+                            >
+                              <span>Subtotal: ${sale.subtotal?.toFixed(2)}</span>
+                              <span>Descuento Aplicado (10%): -${sale.discountAmount?.toFixed(2)}</span>
+                            </div>
+                          )}
 
                           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                             <button

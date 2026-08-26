@@ -6,9 +6,23 @@ export const SaleProvider = ({ children }) => {
   const [sales, setSales] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  // Estado del descuento del 10% en efectivo, guardado en localStorage
+  const [isCashDiscountActive, setIsCashDiscountActive] = useState(() => {
+    const savedState = localStorage.getItem('mg_cash_discount_active');
+    return savedState ? JSON.parse(savedState) : false;
+  });
+
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-  // Obtener ventas guardadas en MongoDB desde el backend
+  // Guardar en localStorage cuando cambie la promo
+  useEffect(() => {
+    localStorage.setItem('mg_cash_discount_active', JSON.stringify(isCashDiscountActive));
+  }, [isCashDiscountActive]);
+
+  const toggleCashDiscount = () => {
+    setIsCashDiscountActive((prev) => !prev);
+  };
+
   const fetchSales = async () => {
     setLoading(true);
     try {
@@ -37,16 +51,14 @@ export const SaleProvider = ({ children }) => {
     fetchSales();
   }, []);
 
-  // Registrar venta enviando datos completos al servidor y actualizando estado local
   const addSale = async (saleData) => {
+    // Enviamos el flag de la promo al servidor para que este aplique y valide las cuentas
     const payload = {
       items: saleData.items || [],
-      subtotal: saleData.subtotal || saleData.total || 0,
-      discount: saleData.discount || 0,
-      total: saleData.total || 0,
-      paidAmount: saleData.paidAmount || saleData.total || 0,
-      changeAmount: saleData.changeAmount || 0,
       paymentMethod: saleData.paymentMethod || 'efectivo',
+      isCashDiscountActive: isCashDiscountActive, // Flag global
+      paidAmount: saleData.paidAmount,
+      changeAmount: saleData.changeAmount || 0,
       seller: saleData.sellerId && saleData.sellerId.length === 24 ? saleData.sellerId : undefined,
       employee: saleData.sellerName || saleData.cashier || 'Empleado Caja',
       status: saleData.status || 'completed'
@@ -74,8 +86,13 @@ export const SaleProvider = ({ children }) => {
         throw new Error(errJson.message || 'Error en el servidor al registrar la orden');
       }
     } catch (error) {
-      console.warn('Conexión con servidor fallida o rechazada. Guardando en modo contingencia local:', error);
+      console.warn('Conexión con servidor fallida. Guardando en modo contingencia local:', error);
       
+      // Contingencia local calculada adecuadamente
+      const subtotal = saleData.subtotal || saleData.total || 0;
+      const discountAmount = (isCashDiscountActive && payload.paymentMethod === 'efectivo') ? subtotal * 0.10 : 0;
+      const totalFinal = subtotal - discountAmount;
+
       const fallbackSale = {
         _id: `SALE-LOCAL-${Date.now()}`,
         id: `SALE-${Date.now()}`,
@@ -87,11 +104,12 @@ export const SaleProvider = ({ children }) => {
         cashier: saleData.sellerName || saleData.cashier || 'Cajero Desconocido',
         sellerRole: saleData.sellerRole || 'cajero',
         items: saleData.items || [],
-        paymentMethod: saleData.paymentMethod || 'efectivo',
-        subtotal: saleData.subtotal || saleData.total || 0,
-        discount: saleData.discount || 0,
-        total: saleData.total || 0,
-        paidAmount: saleData.paidAmount || saleData.total || 0,
+        paymentMethod: payload.paymentMethod,
+        subtotal: subtotal,
+        discountAmount: discountAmount,
+        isCashDiscountApplied: isCashDiscountActive && payload.paymentMethod === 'efectivo',
+        total: totalFinal,
+        paidAmount: saleData.paidAmount || totalFinal,
         changeAmount: saleData.changeAmount || 0,
         status: saleData.status || 'completed'
       };
@@ -101,13 +119,11 @@ export const SaleProvider = ({ children }) => {
     }
   };
 
-  // Función para eliminar/anular una venta y actualizar el estado local
   const deleteSale = async (saleId) => {
     try {
       const storedUser = JSON.parse(localStorage.getItem('mg_user'));
       const token = storedUser?.token;
 
-      // Si es una venta temporal de contingencia (local), la borramos directo del estado
       if (saleId.toString().startsWith('SALE-LOCAL-')) {
         setSales((prevSales) => prevSales.filter((s) => (s._id || s.id) !== saleId));
         return { success: true };
@@ -126,7 +142,6 @@ export const SaleProvider = ({ children }) => {
         throw new Error(errJson.message || 'Error al eliminar la orden en el servidor');
       }
 
-      // Remover del estado local la venta eliminada
       setSales((prevSales) => prevSales.filter((s) => (s._id || s.id) !== saleId));
       return { success: true };
     } catch (error) {
@@ -136,7 +151,15 @@ export const SaleProvider = ({ children }) => {
   };
 
   return (
-    <SaleContext.Provider value={{ sales, addSale, deleteSale, fetchSales, loading }}>
+    <SaleContext.Provider value={{ 
+      sales, 
+      addSale, 
+      deleteSale, 
+      fetchSales, 
+      loading,
+      isCashDiscountActive,
+      toggleCashDiscount
+    }}>
       {children}
     </SaleContext.Provider>
   );
