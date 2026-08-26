@@ -91,15 +91,22 @@ const AdminPanel = () => {
     return { grossTotal, totalDiscounts, netTotal };
   }, [filteredSales]);
 
+  // Nombramientos y límites de turnos ajustados a 08:00 - 13:30 hs y 13:30 - 20:00 hs
   const shiftTotals = useMemo(() => {
     let morning = 0;
     let afternoon = 0;
     filteredSales.forEach((sale) => {
       const saleDate = new Date(sale.createdAt || sale.timestamp || Date.now());
-      const hour = saleDate.getHours();
+      const minutesOfDay = saleDate.getHours() * 60 + saleDate.getMinutes();
       const amount = parseFloat(sale.total) || 0;
-      if (hour >= 6 && hour < 14) morning += amount;
-      else afternoon += amount;
+
+      // Turno Mañana: 08:00 (480 min) a 13:30 (810 min)
+      // Turno Tarde: 13:30 (810 min) a 20:00 (1200 min)
+      if (minutesOfDay >= 480 && minutesOfDay < 810) {
+        morning += amount;
+      } else if (minutesOfDay >= 810 && minutesOfDay < 1200) {
+        afternoon += amount;
+      }
     });
     return { morning, afternoon };
   }, [filteredSales]);
@@ -135,7 +142,20 @@ const AdminPanel = () => {
         sale.items.forEach((item) => {
           const prodId = item.productId || item.product || item.id;
           const qty = parseFloat(item.quantityVal || item.quantity) || 0;
-          const subtotal = parseFloat(item.subtotal || item.price * qty) || 0;
+
+          // Cálculo inteligente de subtotal para el mapa de productos
+          let subtotal = 0;
+          if (item.subtotal !== undefined && item.subtotal !== null) {
+            subtotal = parseFloat(item.subtotal);
+          } else if (item.mode === 'weight' || item.mode === 'kg') {
+            subtotal = ((parseFloat(item.priceKg || item.price || 0)) / 1000) * qty;
+          } else if (item.mode === 'unit_dozen') {
+            if (qty === 12 && item.priceDozen) subtotal = parseFloat(item.priceDozen);
+            else if (qty === 6 && item.priceHalfDozen) subtotal = parseFloat(item.priceHalfDozen);
+            else subtotal = (parseFloat(item.priceUnit || item.price || 0)) * qty;
+          } else {
+            subtotal = (parseFloat(item.priceUnit || item.price || 0)) * qty;
+          }
 
           if (!map[prodId]) {
             map[prodId] = { qty: 0, revenue: 0, name: item.name, mode: item.mode, itemsList: [] };
@@ -378,11 +398,11 @@ const AdminPanel = () => {
                 <div style={styles.subChartRow}>
                   <div>
                     <div style={styles.shiftValue}>${shiftTotals.morning.toFixed(2)}</div>
-                    <div style={styles.shiftLabel}>Turno Mañana (06 - 14 hs)</div>
+                    <div style={styles.shiftLabel}>Turno Mañana (08:00 - 13:30 hs)</div>
                   </div>
                   <div>
                     <div style={styles.shiftValue}>${shiftTotals.afternoon.toFixed(2)}</div>
-                    <div style={styles.shiftLabel}>Turno Tarde (14 - 22 hs)</div>
+                    <div style={styles.shiftLabel}>Turno Tarde (13:30 - 20:00 hs)</div>
                   </div>
                 </div>
               </div>
@@ -520,7 +540,7 @@ const AdminPanel = () => {
               </div>
             </div>
 
-            {/* LISTADO DE VENTAS (SE MUESTRA SOLO SI ISALLSALESEXPANDED ES TRUE) */}
+            {/* LISTADO DE VENTAS */}
             {isAllSalesExpanded && (
               <div style={{ marginTop: '15px', borderTop: '1px solid #e2e8f0', paddingTop: '15px' }}>
                 <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '0 0 12px 0' }}>
@@ -639,7 +659,28 @@ const AdminPanel = () => {
                                       <span>
                                         • {i.name} ({i.mode === 'weight' ? `${i.quantityVal || i.quantity}g` : `x${i.quantityVal || i.quantity}`})
                                       </span>
-                                      <strong>${parseFloat(i.subtotal || (i.price * (i.quantityVal || i.quantity)) || 0).toFixed(2)}</strong>
+                                      <strong>
+                                        ${(() => {
+                                          if (i.subtotal !== undefined && i.subtotal !== null) {
+                                            return parseFloat(i.subtotal).toFixed(2);
+                                          }
+
+                                          const qty = parseFloat(i.quantityVal || i.quantity || 0);
+
+                                          if (i.mode === 'weight' || i.mode === 'kg') {
+                                            const pricePerKg = parseFloat(i.priceKg || i.price || 0);
+                                            return ((pricePerKg / 1000) * qty).toFixed(2);
+                                          }
+
+                                          if (i.mode === 'unit_dozen') {
+                                            if (qty === 12 && i.priceDozen) return parseFloat(i.priceDozen).toFixed(2);
+                                            if (qty === 6 && i.priceHalfDozen) return parseFloat(i.priceHalfDozen).toFixed(2);
+                                          }
+
+                                          const unitPrice = parseFloat(i.priceUnit || i.price || 0);
+                                          return (unitPrice * qty).toFixed(2);
+                                        })()}
+                                      </strong>
                                     </div>
                                   ))
                                 ) : (
