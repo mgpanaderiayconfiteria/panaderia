@@ -24,6 +24,9 @@ const NuevoCliente = () => {
   const [paymentStep, setPaymentStep] = useState('select_method');
   const [cashGiven, setCashGiven] = useState('');
 
+  // Estado para prevenir múltiples ejecuciones durante el cobro
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const categoryProducts = useMemo(() => {
     return products.filter((p) => (p.category || 'Panadería') === activeCategory);
   }, [products, activeCategory]);
@@ -110,25 +113,32 @@ const NuevoCliente = () => {
     const given = parseFloat(cashGiven) || 0;
     if (given < totalCart) return;
 
-    await addSale({
-      sellerId: user?._id || user?.id,
-      sellerName: user?.name || user?.email || 'Empleado Caja',
-      sellerRole: user?.role || 'cajero',
-      cashier: user?.name || user?.email || 'Empleado Caja',
-      items: cart,
-      paymentMethod: 'efectivo',
-      subtotal: totalCart,
-      total: totalCart,
-      paidAmount: given,
-      changeAmount: changeAmount,
-      timestamp: new Date().toISOString()
-    });
+    setIsSubmitting(true);
+    try {
+      await addSale({
+        sellerId: user?._id || user?.id,
+        sellerName: user?.name || user?.email || 'Empleado Caja',
+        sellerRole: user?.role || 'cajero',
+        cashier: user?.name || user?.email || 'Empleado Caja',
+        items: cart,
+        paymentMethod: 'efectivo',
+        subtotal: totalCart,
+        total: totalCart,
+        paidAmount: given,
+        changeAmount: changeAmount,
+        timestamp: new Date().toISOString()
+      });
 
-    setShowCheckoutModal(false);
-    setCart([]);
-    setCashGiven('');
-    setPaymentStep('select_method');
-    navigate('/caja');
+      setShowCheckoutModal(false);
+      setCart([]);
+      setCashGiven('');
+      setPaymentStep('select_method');
+      navigate('/caja');
+    } catch (e) {
+      alert('Error al procesar la venta.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -194,6 +204,31 @@ const NuevoCliente = () => {
           box-shadow: 0 -4px 12px rgba(185, 28, 28, 0.25);
           z-index: 100;
           cursor: pointer;
+          transition: transform 0.1s ease, background-color 0.1s ease;
+        }
+
+        .bottom-floating-bar:active {
+          transform: scale(0.99);
+          background-color: #b91c1c;
+        }
+
+        /* Animaciones para botones genéricos */
+        button {
+          transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.15s ease, box-shadow 0.1s ease;
+          user-select: none;
+        }
+
+        button:active:not(:disabled) {
+          transform: scale(0.94);
+        }
+
+        .product-card-item {
+          transition: transform 0.1s ease, box-shadow 0.1s ease;
+          user-select: none;
+        }
+
+        .product-card-item:active {
+          transform: scale(0.95);
         }
 
         @media (min-width: 768px) {
@@ -257,7 +292,7 @@ const NuevoCliente = () => {
             {categoryProducts.map((p) => {
               const prodId = p._id || p.id;
               return (
-                <div key={prodId} onClick={() => handleSelectProduct(p)} style={styles.productCard}>
+                <div key={prodId} onClick={() => handleSelectProduct(p)} className="product-card-item" style={styles.productCard}>
                   {p.image ? <img src={p.image} alt={p.name} style={styles.cardImg} /> : <div style={styles.noCardImg}>🥐</div>}
                   <div style={styles.cardFooter}>
                     <span style={styles.cardTitle}>{p.name}</span>
@@ -431,15 +466,16 @@ const NuevoCliente = () => {
                     placeholder="Monto entregado por el cliente"
                     autoFocus
                     style={styles.touchInput}
+                    disabled={isSubmitting}
                   />
                 </div>
 
                 <div style={styles.quickPresetsRow}>
-                  <button onClick={() => setCashGiven(totalCart.toString())} style={styles.presetBtn}>Monto Exacto</button>
-                  <button onClick={() => setCashGiven('1000')} style={styles.presetBtn}>$1.000</button>
-                  <button onClick={() => setCashGiven('2000')} style={styles.presetBtn}>$2.000</button>
-                  <button onClick={() => setCashGiven('5000')} style={styles.presetBtn}>$5.000</button>
-                  <button onClick={() => setCashGiven('10000')} style={styles.presetBtn}>$10.000</button>
+                  <button onClick={() => setCashGiven(totalCart.toString())} style={styles.presetBtn} disabled={isSubmitting}>Monto Exacto</button>
+                  <button onClick={() => setCashGiven('1000')} style={styles.presetBtn} disabled={isSubmitting}>$1.000</button>
+                  <button onClick={() => setCashGiven('2000')} style={styles.presetBtn} disabled={isSubmitting}>$2.000</button>
+                  <button onClick={() => setCashGiven('5000')} style={styles.presetBtn} disabled={isSubmitting}>$5.000</button>
+                  <button onClick={() => setCashGiven('10000')} style={styles.presetBtn} disabled={isSubmitting}>$10.000</button>
                 </div>
 
                 <div style={{ ...styles.subtotalDisplay, backgroundColor: (parseFloat(cashGiven) || 0) < totalCart ? '#fef2f2' : '#fef2f2' }}>
@@ -450,20 +486,20 @@ const NuevoCliente = () => {
                 </div>
 
                 <div style={{ display: 'flex', gap: '10px' }}>
-                  <button onClick={() => setPaymentStep('select_method')} style={{ ...styles.btnVolver, flex: 1 }}>
+                  <button onClick={() => setPaymentStep('select_method')} style={{ ...styles.btnVolver, flex: 1 }} disabled={isSubmitting}>
                     Volver
                   </button>
                   <button
                     onClick={handleConfirmCashSale}
-                    disabled={(parseFloat(cashGiven) || 0) < totalCart}
+                    disabled={(parseFloat(cashGiven) || 0) < totalCart || isSubmitting}
                     style={{
                       ...styles.btnAddCart,
                       flex: 2,
-                      backgroundColor: (parseFloat(cashGiven) || 0) < totalCart ? '#fca5a5' : '#dc2626',
-                      cursor: (parseFloat(cashGiven) || 0) < totalCart ? 'not-allowed' : 'pointer'
+                      backgroundColor: ((parseFloat(cashGiven) || 0) < totalCart || isSubmitting) ? '#fca5a5' : '#dc2626',
+                      cursor: ((parseFloat(cashGiven) || 0) < totalCart || isSubmitting) ? 'not-allowed' : 'pointer'
                     }}
                   >
-                    CONFIRMAR Y REGISTRAR
+                    {isSubmitting ? 'PROCESANDO...' : 'CONFIRMAR Y REGISTRAR'}
                   </button>
                 </div>
               </div>

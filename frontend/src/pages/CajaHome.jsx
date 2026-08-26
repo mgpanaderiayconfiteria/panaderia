@@ -19,6 +19,9 @@ const CajaHome = () => {
   const [showWasteModal, setShowWasteModal] = useState(false);
   const [showQuickProdModal, setShowQuickProdModal] = useState(false);
 
+  // Estado para bloquear múltiples clics accidentales
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [initialCash, setInitialCash] = useState(localStorage.getItem('mg_initial_cash') || '0');
   const [tempCashInput, setTempCashInput] = useState('');
   const [actualCashInput, setActualCashInput] = useState('');
@@ -61,7 +64,9 @@ const CajaHome = () => {
       return;
     }
 
+    setIsSubmitting(true);
     const prodObj = products.find(p => (p._id || p.id) === selectedWasteProd);
+
     try {
       const res = await fetch(`${API_URL}/api/shifts/waste`, {
         method: 'POST',
@@ -86,6 +91,8 @@ const CajaHome = () => {
       }
     } catch (e) {
       alert('Error de conexión al registrar sobrante.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -95,6 +102,7 @@ const CajaHome = () => {
       return;
     }
 
+    setIsSubmitting(true);
     const priceNum = parseFloat(newProd.price) || 0;
     const stockNum = parseFloat(newProd.stock) || 0;
     const costNum = parseFloat(newProd.cost) || 0;
@@ -117,11 +125,17 @@ const CajaHome = () => {
       stock: stockNum
     };
 
-    const saved = await addProduct(payload);
-    if (saved) {
-      alert('📦 Producto dado de alta e incorporado al catálogo.');
-      setShowQuickProdModal(false);
-      setNewProd({ name: '', price: '', cost: '', stock: '', category: 'Panadería', sellType: 'unidad' });
+    try {
+      const saved = await addProduct(payload);
+      if (saved) {
+        alert('📦 Producto dado de alta e incorporado al catálogo.');
+        setShowQuickProdModal(false);
+        setNewProd({ name: '', price: '', cost: '', stock: '', category: 'Panadería', sellType: 'unidad' });
+      }
+    } catch (e) {
+      alert('Error al guardar el producto.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -131,6 +145,7 @@ const CajaHome = () => {
       return;
     }
 
+    setIsSubmitting(true);
     const closurePayload = {
       employee: user?.name || user?.username || 'Cajera',
       initialCash: fondoInicialNum,
@@ -150,6 +165,8 @@ const CajaHome = () => {
       });
     } catch (e) {
       console.warn('Servidor no disponible para guardar el reporte físico del turno.');
+    } finally {
+      setIsSubmitting(false);
     }
 
     alert(`Turno cerrado exitosamente.\n\nEfectivo Esperado: $${efectivoEsperadoEnCaja.toFixed(2)}\nEfectivo Real: $${efectivoRealNum.toFixed(2)}\nDiferencia: $${diferenciaCaja.toFixed(2)}`);
@@ -234,12 +251,39 @@ const CajaHome = () => {
           justify-content: center;
           text-align: center;
           padding: 10px;
-          transition: transform 0.2s ease, box-shadow 0.2s ease;
+          /* Transición fluida para la animación */
+          transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.1s ease, opacity 0.2s ease;
           user-select: none;
         }
 
+        /* Animación de pulsación para los botones principales */
         .btn-circle:active {
-          transform: scale(0.95);
+          transform: scale(0.92);
+          box-shadow: 0px 2px 4px rgba(185, 28, 28, 0.15);
+        }
+
+        /* Animación para botones dentro de los modales */
+        .btn-action-rojo {
+          width: 100%;
+          padding: 12px;
+          background-color: #dc2626;
+          color: #fff;
+          border: none;
+          border-radius: 8px;
+          font-weight: bold;
+          font-size: 0.95rem;
+          cursor: pointer;
+          transition: transform 0.1s ease, box-shadow 0.1s ease, background-color 0.2s ease;
+        }
+
+        .btn-action-rojo:active:not(:disabled) {
+          transform: scale(0.96);
+          box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .btn-action-rojo:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
         }
 
         /* Degradado cromático en tonos de rojo inspirados en el diseño */
@@ -335,7 +379,7 @@ const CajaHome = () => {
               style={styles.inputForm}
               autoFocus
             />
-            <button onClick={handleConfirmApertura} style={styles.btnConfirmarRojo}>
+            <button onClick={handleConfirmApertura} className="btn-action-rojo">
               CONFIRMAR FONDO INICIAL
             </button>
           </div>
@@ -370,6 +414,7 @@ const CajaHome = () => {
               value={selectedWasteProd}
               onChange={(e) => setSelectedWasteProd(e.target.value)}
               style={styles.inputForm}
+              disabled={isSubmitting}
             >
               <option value="">-- Seleccionar Producto --</option>
               {products.map((p) => (
@@ -384,9 +429,14 @@ const CajaHome = () => {
               value={wasteQty}
               onChange={(e) => setWasteQty(e.target.value)}
               style={styles.inputForm}
+              disabled={isSubmitting}
             />
-            <button onClick={handleRegisterWaste} style={styles.btnConfirmarRojo}>
-              CONFIRMAR BAJA POR SOBRANTE
+            <button 
+              onClick={handleRegisterWaste} 
+              className="btn-action-rojo"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'PROCESANDO...' : 'CONFIRMAR BAJA POR SOBRANTE'}
             </button>
           </div>
         </div>
@@ -407,6 +457,7 @@ const CajaHome = () => {
               value={newProd.name}
               onChange={(e) => setNewProd({ ...newProd, name: e.target.value })}
               style={styles.inputForm}
+              disabled={isSubmitting}
             />
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -414,6 +465,7 @@ const CajaHome = () => {
                 value={newProd.category}
                 onChange={(e) => setNewProd({ ...newProd, category: e.target.value })}
                 style={styles.inputForm}
+                disabled={isSubmitting}
               >
                 <option value="Panadería">Panadería</option>
                 <option value="Facturería">Facturería</option>
@@ -426,6 +478,7 @@ const CajaHome = () => {
                 value={newProd.sellType}
                 onChange={(e) => setNewProd({ ...newProd, sellType: e.target.value })}
                 style={styles.inputForm}
+                disabled={isSubmitting}
               >
                 <option value="unidad">Por Unidad</option>
                 <option value="peso">Por Peso (Kg/Gr)</option>
@@ -441,6 +494,7 @@ const CajaHome = () => {
                 value={newProd.price}
                 onChange={(e) => setNewProd({ ...newProd, price: e.target.value })}
                 style={styles.inputForm}
+                disabled={isSubmitting}
               />
               <input
                 type="number"
@@ -449,6 +503,7 @@ const CajaHome = () => {
                 value={newProd.cost}
                 onChange={(e) => setNewProd({ ...newProd, cost: e.target.value })}
                 style={styles.inputForm}
+                disabled={isSubmitting}
               />
             </div>
 
@@ -458,10 +513,15 @@ const CajaHome = () => {
               value={newProd.stock}
               onChange={(e) => setNewProd({ ...newProd, stock: e.target.value })}
               style={styles.inputForm}
+              disabled={isSubmitting}
             />
 
-            <button onClick={handleQuickAddProduct} style={styles.btnConfirmarRojo}>
-              INGRESAR PRODUCTO AL STOCK
+            <button 
+              onClick={handleQuickAddProduct} 
+              className="btn-action-rojo"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'GUARDANDO...' : 'INGRESAR PRODUCTO AL STOCK'}
             </button>
           </div>
         </div>
@@ -511,6 +571,7 @@ const CajaHome = () => {
                   value={actualCashInput}
                   onChange={(e) => setActualCashInput(e.target.value)}
                   style={{ ...styles.inputForm, border: '2px solid #dc2626', fontSize: '1rem', fontWeight: 'bold' }}
+                  disabled={isSubmitting}
                 />
               </div>
 
@@ -532,8 +593,12 @@ const CajaHome = () => {
               )}
             </div>
 
-            <button onClick={handleFinalizarTurno} style={styles.btnConfirmarRojo}>
-              CONFIRMAR Y FINALIZAR TURNO
+            <button 
+              onClick={handleFinalizarTurno} 
+              className="btn-action-rojo"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'CERRANDO TURNO...' : 'CONFIRMAR Y FINALIZAR TURNO'}
             </button>
           </div>
         </div>
@@ -549,8 +614,7 @@ const styles = {
   btnCloseModal: { backgroundColor: '#fecaca', color: '#991b1b', border: 'none', padding: '6px 10px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.8rem' },
   modalBody: { padding: '10px', overflowY: 'auto', flex: 1 },
   resumenRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem', color: '#7f1d1d' },
-  inputForm: { padding: '8px 10px', borderRadius: '8px', border: '1px solid #fca5a5', fontSize: '0.9rem', width: '100%', boxSizing: 'border-box' },
-  btnConfirmarRojo: { width: '100%', padding: '12px', backgroundColor: '#dc2626', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.95rem', cursor: 'pointer' }
+  inputForm: { padding: '8px 10px', borderRadius: '8px', border: '1px solid #fca5a5', fontSize: '0.9rem', width: '100%', boxSizing: 'border-box' }
 };
 
 export default CajaHome;
