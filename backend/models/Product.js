@@ -6,11 +6,18 @@ const productSchema = new mongoose.Schema({
     required: [true, 'El nombre del producto es obligatorio'],
     trim: true
   },
+  // Categoría escrita libremente
   category: {
     type: String,
-    required: true,
-    enum: ['Panadería', 'Facturería', 'Repostería', 'Cafetería', 'Especialidades'],
-    default: 'Panadería'
+    required: [true, 'La categoría es obligatoria'],
+    trim: true,
+    default: 'General'
+  },
+  // Subcategoría opcional
+  subcategory: {
+    type: String,
+    trim: true,
+    default: ''
   },
 
   // Habilitadores independientes de modalidades de venta

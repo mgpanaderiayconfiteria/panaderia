@@ -20,6 +20,7 @@ exports.createProduct = async (req, res) => {
     const {
       name,
       category,
+      subcategory,
       allowByUnit,
       allowByWeight,
       allowByPorcion,
@@ -60,7 +61,8 @@ exports.createProduct = async (req, res) => {
 
     const newProduct = new Product({
       name,
-      category: category || 'Panadería',
+      category: category?.trim() || 'General',
+      subcategory: subcategory?.trim() || '',
       allowByUnit: Boolean(allowByUnit),
       allowByWeight: Boolean(allowByWeight),
       allowByPorcion: Boolean(allowByPorcion),
@@ -96,6 +98,8 @@ exports.updateProduct = async (req, res) => {
   console.log(`✏️ [PRODUCTOS] Intentando actualizar producto ID: ${id}`);
   try {
     const {
+      category,
+      subcategory,
       priceUnit,
       priceHalfDozen,
       priceDozen,
@@ -116,6 +120,9 @@ exports.updateProduct = async (req, res) => {
     const parsedPricePorcion = parseFloat(pricePorcion || 0);
 
     const updateData = { ...req.body };
+    if (category) updateData.category = category.trim();
+    if (subcategory !== undefined) updateData.subcategory = subcategory.trim();
+
     updateData.priceHalfDozen = parsedPriceHalfDozen;
     updateData.priceDozen = parsedPriceDozen;
     updateData.price = parsedPriceUnit || parsedPriceHalfDozen || parsedPriceDozen || parsedPriceKg || parsedPricePorcion || req.body.price || 0;

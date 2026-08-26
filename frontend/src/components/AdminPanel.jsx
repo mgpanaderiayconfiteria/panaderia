@@ -84,7 +84,7 @@ const AdminPanel = () => {
           const prodId = item.productId || item.product || item.id;
           const qty = parseFloat(item.quantityVal || item.quantity) || 0;
           const subtotal = parseFloat(item.subtotal || item.price * qty) || 0;
-          if (!map[prodId]) map[prodId] = { qty: 0, revenue: 0, name: item.name };
+          if (!map[prodId]) map[prodId] = { qty: 0, revenue: 0, name: item.name, mode: item.mode };
           map[prodId].qty += qty;
           map[prodId].revenue += subtotal;
         });
@@ -93,17 +93,20 @@ const AdminPanel = () => {
     return map;
   }, [filteredSales]);
 
-  // 5. Lista de productos con Análisis de Ganancia Neta ($) ordenada de MAYOR a MENOR ganancia
+  // 5. Lista de productos con Análisis de Ganancia Neta ($) adaptado a Peso / Unidades
   const productsProfitability = useMemo(() => {
     return products.map((p) => {
       const prodId = p._id || p.id;
       const realSales = productSalesMap[prodId] || { qty: 0, revenue: 0 };
       const unitsSold = realSales.qty;
       const revenue = realSales.revenue;
-      const unitCost = parseFloat(p.cost || p.cogs || 0);
-      const totalCogs = unitCost * unitsSold;
+      const unitCost = parseFloat(p.cogs || p.cost || 0);
+
+      // Si el producto se vende por peso, los gramos vendidos se convierten a Kilos para calcular el COGS
+      const totalCogs = p.allowByWeight ? (unitsSold / 1000) * unitCost : unitsSold * unitCost;
       const netProfit = revenue - totalCogs;
-      const priceUnit = parseFloat(p.priceUnit || p.price || p.priceKg || 0);
+
+      const priceUnit = parseFloat(p.priceUnit || p.priceKg || p.pricePorcion || p.price || 0);
       const marginPct = priceUnit > 0 ? (((priceUnit - unitCost) / priceUnit) * 100).toFixed(1) : 0;
 
       return {
@@ -317,7 +320,9 @@ const AdminPanel = () => {
                     topProductsList.map((p, idx) => (
                       <div key={idx} style={styles.topProdRow}>
                         <span>{idx + 1}. {p.name}</span>
-                        <strong>{p.qty.toFixed(1)}</strong>
+                        <strong>
+                          {p.mode === 'weight' ? `${(p.qty / 1000).toFixed(2)} kg` : `${p.qty.toFixed(0)} un`}
+                        </strong>
                       </div>
                     ))
                   )}
@@ -325,12 +330,15 @@ const AdminPanel = () => {
               </div>
             </div>
 
-            {/* CARD 3: ALERTAS DE STOCK Y DESPERDICIO (AGRUPADAS) */}
+            {/* CARD 3: ALERTAS DE STOCK Y DESPERDICIO (DINÁMICO POR UNIDAD / PESO) */}
             <div style={styles.card}>
               <h2 style={styles.cardTitle}>ALERTAS DE STOCK Y DESPERDICIO</h2>
               <div style={styles.sidebarSection}>
                 {(() => {
-                  const lowStockProducts = products.filter((p) => (p.stock || 0) <= 5);
+                  const lowStockProducts = products.filter((p) => {
+                    if (p.allowByWeight) return (p.stockGrams || p.stock || 0) <= 2000; // Menos de 2kg
+                    return (p.stockUnits || p.stock || 0) <= 5; // Menos de 5 unidades/porciones
+                  });
 
                   if (lowStockProducts.length === 0 && wasteLogs.length === 0) {
                     return <div style={styles.badgeGray}>Stock normal y sin mermas activas</div>;
@@ -343,11 +351,16 @@ const AdminPanel = () => {
                         <div style={{ ...styles.badgeGray, backgroundColor: '#fff7ed', border: '1px solid #ffedd5' }}>
                           ⚠️ <strong style={{ color: '#c2410c' }}>{lowStockProducts.length} productos con stock bajo:</strong>
                           <div style={styles.groupedList}>
-                            {lowStockProducts.map((p) => (
-                              <span key={p.id || p._id} style={styles.groupedItem}>
-                                • {p.name} (<strong>{p.stock || 0}</strong>)
-                              </span>
-                            ))}
+                            {lowStockProducts.map((p) => {
+                              const currStock = p.allowByWeight
+                                ? `${((p.stockGrams || p.stock || 0) / 1000).toFixed(1)} kg`
+                                : `${p.stockUnits || p.stock || 0} un`;
+                              return (
+                                <span key={p.id || p._id} style={styles.groupedItem}>
+                                  • {p.name} (<strong>{currStock}</strong>)
+                                </span>
+                              );
+                            })}
                           </div>
                         </div>
                       )}
@@ -409,6 +422,7 @@ const AdminPanel = () => {
                 <thead>
                   <tr style={styles.trHead}>
                     <th style={styles.th}>Producto</th>
+                    <th style={styles.th}>Categoría</th>
                     <th style={styles.th}>Cant. Vendida</th>
                     <th style={styles.th}>Ingresos Reales</th>
                     <th style={styles.th}>Costo Estimado (COGS)</th>
@@ -417,20 +431,30 @@ const AdminPanel = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {productsProfitability.map((p) => (
-                    <tr key={p._id || p.id} style={styles.trBody}>
-                      <td style={styles.td}><strong>{p.name}</strong></td>
-                      <td style={styles.td}>{p.unitsSold.toFixed(2)}</td>
-                      <td style={styles.td}>${p.revenue.toFixed(2)}</td>
-                      <td style={styles.td}>${p.totalCogs.toFixed(2)}</td>
-                      <td style={{ ...styles.td, color: p.marginPct > 30 ? '#166534' : '#b45309', fontWeight: 'bold' }}>
-                        {p.marginPct}%
-                      </td>
-                      <td style={{ ...styles.td, color: p.netProfit >= 0 ? '#166534' : '#dc2626', fontWeight: 'bold', fontSize: '0.85rem' }}>
-                        ${p.netProfit.toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
+                  {productsProfitability.map((p) => {
+                    const formattedQty = p.allowByWeight
+                      ? `${(p.unitsSold / 1000).toFixed(2)} kg`
+                      : `${p.unitsSold.toFixed(0)} un`;
+
+                    return (
+                      <tr key={p._id || p.id} style={styles.trBody}>
+                        <td style={styles.td}><strong>{p.name}</strong></td>
+                        <td style={styles.td}>
+                          <span style={styles.badgeCat}>{p.category || 'General'}</span>
+                          {p.subcategory && <span style={styles.badgeSubCat}>{p.subcategory}</span>}
+                        </td>
+                        <td style={styles.td}>{formattedQty}</td>
+                        <td style={styles.td}>${p.revenue.toFixed(2)}</td>
+                        <td style={styles.td}>${p.totalCogs.toFixed(2)}</td>
+                        <td style={{ ...styles.td, color: p.marginPct > 30 ? '#166534' : '#b45309', fontWeight: 'bold' }}>
+                          {p.marginPct}%
+                        </td>
+                        <td style={{ ...styles.td, color: p.netProfit >= 0 ? '#166534' : '#dc2626', fontWeight: 'bold', fontSize: '0.85rem' }}>
+                          ${p.netProfit.toFixed(2)}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
@@ -487,7 +511,9 @@ const styles = {
   th: { padding: '8px', textAlign: 'left', color: '#475569', fontWeight: '600' },
   trBody: { borderBottom: '1px solid #f1f5f9' },
   td: { padding: '8px', color: '#334155' },
-  emptyText: { color: '#94a3b8', fontSize: '0.85rem', marginTop: '10px' }
+  emptyText: { color: '#94a3b8', fontSize: '0.85rem', marginTop: '10px' },
+  badgeCat: { backgroundColor: '#e2e8f0', color: '#1e293b', padding: '2px 6px', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 'bold', marginRight: '4px' },
+  badgeSubCat: { backgroundColor: '#fecaca', color: '#991b1b', padding: '2px 6px', borderRadius: '10px', fontSize: '0.65rem', fontWeight: '500' }
 };
 
 export default AdminPanel;

@@ -3,7 +3,8 @@ import { ProductContext } from '../context/ProductContext';
 
 const INITIAL_FORM = {
   name: '',
-  category: 'Panadería',
+  category: '',
+  subcategory: '',
   allowByUnit: true,
   allowByWeight: false,
   allowByPorcion: false,
@@ -14,7 +15,7 @@ const INITIAL_FORM = {
   priceKg: '',
   pricePorcion: '',
   cogs: '',
-  desiredMargin: '', // Margen porcentual deseado (%)
+  desiredMargin: '',
   stockUnits: '',
   stockGrams: '',
   stockPorciones: '',
@@ -26,7 +27,6 @@ const ProductsManager = () => {
   const [formData, setFormData] = useState(INITIAL_FORM);
   const [editingId, setEditingId] = useState(null);
 
-  // Manejo de cambios generales
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
@@ -35,7 +35,6 @@ const ProductsManager = () => {
     }));
   };
 
-  // 🧮 Lógica de auto-cálculo de Margen % y Precios
   const handleCostOrMarginChange = (e) => {
     const { name, value } = e.target;
     const numVal = parseFloat(value) || 0;
@@ -45,7 +44,6 @@ const ProductsManager = () => {
       const cost = name === 'cogs' ? numVal : parseFloat(prev.cogs) || 0;
       const margin = name === 'desiredMargin' ? numVal : parseFloat(prev.desiredMargin) || 0;
 
-      // Si hay un costo y un margen definidos, auto-calculamos los precios activos
       if (cost > 0 && margin > 0) {
         const calculatedPrice = (cost * (1 + margin / 100)).toFixed(2);
 
@@ -68,10 +66,12 @@ const ProductsManager = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name) return;
+    if (!formData.name || !formData.category) return;
 
     const payload = {
       ...formData,
+      category: formData.category.trim(),
+      subcategory: formData.subcategory.trim(),
       priceUnit: parseFloat(formData.priceUnit || 0),
       priceHalfDozen: parseFloat(formData.priceHalfDozen || 0),
       priceDozen: parseFloat(formData.priceDozen || 0),
@@ -100,7 +100,8 @@ const ProductsManager = () => {
 
     setFormData({
       name: p.name || '',
-      category: p.category || 'Panadería',
+      category: p.category || '',
+      subcategory: p.subcategory || '',
       allowByUnit: p.allowByUnit ?? true,
       allowByWeight: p.allowByWeight ?? false,
       allowByPorcion: p.allowByPorcion ?? false,
@@ -144,9 +145,12 @@ const ProductsManager = () => {
 
             <div style={styles.group}>
               <label style={styles.label}>Categoría</label>
-              <select name="category" value={formData.category} onChange={handleChange} style={styles.input}>
-                {['Panadería', 'Facturería', 'Repostería', 'Cafetería', 'Especialidades'].map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
+              <input type="text" name="category" value={formData.category} onChange={handleChange} placeholder="Ej. Panadería, Bebidas..." style={styles.input} required />
+            </div>
+
+            <div style={styles.group}>
+              <label style={styles.label}>Subcategoría (Opcional)</label>
+              <input type="text" name="subcategory" value={formData.subcategory} onChange={handleChange} placeholder="Ej. Dulce, Salado..." style={styles.input} />
             </div>
 
             <div style={styles.group}>
@@ -160,30 +164,28 @@ const ProductsManager = () => {
             </div>
           </div>
 
-          {/* Opciones de Modalidades de Venta */}
           <div style={styles.optionsBox}>
             <span style={styles.optionsTitle}>Modalidades de Venta y Cobro Habilitadas:</span>
             <div style={{ display: 'flex', gap: '16px', marginTop: '8px', flexWrap: 'wrap' }}>
               <label style={styles.checkboxLabel}>
                 <input type="checkbox" name="allowByUnit" checked={formData.allowByUnit} onChange={handleChange} />
-                Por Unidad / Docenas (Facturas, Panes)
+                Por Unidad / Docenas
               </label>
               <label style={styles.checkboxLabel}>
                 <input type="checkbox" name="allowByWeight" checked={formData.allowByWeight} onChange={handleChange} />
-                Por Peso en Gramos / Kg
+                Por Peso (Gr/Kg)
               </label>
               <label style={styles.checkboxLabel}>
                 <input type="checkbox" name="allowByPorcion" checked={formData.allowByPorcion} onChange={handleChange} />
-                Por Porción / Fracción (Tartas)
+                Por Porción / Fracción
               </label>
               <label style={styles.checkboxLabel}>
                 <input type="checkbox" name="allowByAmount" checked={formData.allowByAmount} onChange={handleChange} />
-                Por Monto Fijo en $ (ej. $4000 de pan)
+                Por Monto Fijo en $
               </label>
             </div>
           </div>
 
-          {/* Secciones Dinámicas de Precios (Auto-calculados o editables) */}
           <div style={styles.formRow}>
             {formData.allowByUnit && (
               <>
@@ -193,11 +195,11 @@ const ProductsManager = () => {
                 </div>
                 <div style={styles.group}>
                   <label style={styles.label}>Precio 1/2 Docena ($)</label>
-                  <input type="number" step="0.01" name="priceHalfDozen" value={formData.priceHalfDozen} onChange={handleChange} placeholder="Ej. 2700 (Opcional)" style={styles.input} />
+                  <input type="number" step="0.01" name="priceHalfDozen" value={formData.priceHalfDozen} onChange={handleChange} placeholder="Ej. 2700" style={styles.input} />
                 </div>
                 <div style={styles.group}>
                   <label style={styles.label}>Precio Docena ($)</label>
-                  <input type="number" step="0.01" name="priceDozen" value={formData.priceDozen} onChange={handleChange} placeholder="Ej. 5000 (Opcional)" style={styles.input} />
+                  <input type="number" step="0.01" name="priceDozen" value={formData.priceDozen} onChange={handleChange} placeholder="Ej. 5000" style={styles.input} />
                 </div>
               </>
             )}
@@ -217,25 +219,24 @@ const ProductsManager = () => {
             )}
           </div>
 
-          {/* Secciones Dinámicas de Stocks Independientes */}
           <div style={styles.formRow}>
             {formData.allowByUnit && (
               <div style={styles.group}>
-                <label style={styles.label}>Stock en Unidades (un)</label>
+                <label style={styles.label}>Stock (Unidades)</label>
                 <input type="number" step="1" name="stockUnits" value={formData.stockUnits} onChange={handleChange} placeholder="Ej. 120" style={styles.input} />
               </div>
             )}
 
             {formData.allowByWeight && (
               <div style={styles.group}>
-                <label style={styles.label}>Stock en Gramos (gr)</label>
-                <input type="number" step="1" name="stockGrams" value={formData.stockGrams} onChange={handleChange} placeholder="Ej. 15000 (15 kg)" style={styles.input} />
+                <label style={styles.label}>Stock (Gramos)</label>
+                <input type="number" step="1" name="stockGrams" value={formData.stockGrams} onChange={handleChange} placeholder="Ej. 15000" style={styles.input} />
               </div>
             )}
 
             {formData.allowByPorcion && (
               <div style={styles.group}>
-                <label style={styles.label}>Stock en Porciones (porc)</label>
+                <label style={styles.label}>Stock (Porciones)</label>
                 <input type="number" step="1" name="stockPorciones" value={formData.stockPorciones} onChange={handleChange} placeholder="Ej. 8" style={styles.input} />
               </div>
             )}
@@ -257,7 +258,6 @@ const ProductsManager = () => {
         </form>
       </div>
 
-      {/* Tabla del Catálogo con Detalle Multi-Modal y Margen */}
       <div style={{ ...styles.card, marginTop: '20px' }}>
         <h2 style={styles.title}>CATÁLOGO COMPLETO DE PRODUCTOS</h2>
         {products.length === 0 ? <p style={{ color: '#94a3b8', fontSize: '0.85rem' }}>No hay productos cargados.</p> : (
@@ -267,10 +267,11 @@ const ProductsManager = () => {
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                   <th style={styles.th}>Imagen</th>
                   <th style={styles.th}>Nombre</th>
+                  <th style={styles.th}>Categoría / Subcategoría</th>
                   <th style={styles.th}>Costo / Margen</th>
-                  <th style={styles.th}>Modalidades Habilitadas</th>
-                  <th style={styles.th}>Precios de Venta</th>
-                  <th style={styles.th}>Inventario / Stock</th>
+                  <th style={styles.th}>Modalidades</th>
+                  <th style={styles.th}>Precios</th>
+                  <th style={styles.th}>Stock</th>
                   <th style={{ ...styles.th, textAlign: 'center' }}>Acciones</th>
                 </tr>
               </thead>
@@ -286,9 +287,10 @@ const ProductsManager = () => {
                       <td style={styles.td}>
                         {p.image ? <img src={p.image} alt={p.name} style={styles.tableImg} /> : <div style={styles.noImg}>Sin foto</div>}
                       </td>
+                      <td style={styles.td}><strong>{p.name}</strong></td>
                       <td style={styles.td}>
-                        <strong>{p.name}</strong>
-                        <div><span style={styles.badgeCat}>{p.category || 'Panadería'}</span></div>
+                        <span style={styles.badgeCat}>{p.category || 'General'}</span>
+                        {p.subcategory && <span style={styles.badgeSubCat}>{p.subcategory}</span>}
                       </td>
                       <td style={styles.td}>
                         <div style={{ fontSize: '0.78rem' }}>
@@ -299,7 +301,7 @@ const ProductsManager = () => {
                       <td style={styles.td}>
                         <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                           {p.allowByUnit && <span style={styles.badgeType}>UNIDAD</span>}
-                          {p.allowByWeight && <span style={styles.badgeType}>PESO (GR/KG)</span>}
+                          {p.allowByWeight && <span style={styles.badgeType}>PESO</span>}
                           {p.allowByPorcion && <span style={styles.badgeType}>PORCIÓN</span>}
                           {p.allowByAmount && <span style={styles.badgeType}>MONTO $</span>}
                         </div>
@@ -355,7 +357,8 @@ const styles = {
   td: { padding: '10px 8px', color: '#334155', verticalAlign: 'middle' },
   tableImg: { width: '36px', height: '36px', borderRadius: '4px', objectFit: 'cover' },
   noImg: { width: '36px', height: '36px', borderRadius: '4px', backgroundColor: '#f1f5f9', color: '#94a3b8', fontSize: '0.65rem', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  badgeCat: { backgroundColor: '#e2e8f0', color: '#1e293b', padding: '2px 8px', borderRadius: '12px', fontSize: '0.70rem', fontWeight: '500' },
+  badgeCat: { backgroundColor: '#e2e8f0', color: '#1e293b', padding: '2px 8px', borderRadius: '12px', fontSize: '0.70rem', fontWeight: 'bold', marginRight: '4px' },
+  badgeSubCat: { backgroundColor: '#fecaca', color: '#991b1b', padding: '2px 8px', borderRadius: '12px', fontSize: '0.70rem', fontWeight: '500' },
   badgeType: { backgroundColor: '#f1f5f9', color: '#0f172a', border: '1px solid #cbd5e1', padding: '2px 6px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: '600' },
   btnEdit: { backgroundColor: '#2563eb', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold', marginRight: '6px', cursor: 'pointer' },
   btnDel: { backgroundColor: '#dc2626', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer' }

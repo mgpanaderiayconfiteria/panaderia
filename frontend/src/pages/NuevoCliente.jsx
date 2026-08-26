@@ -1,4 +1,4 @@
-import React, { useState, useContext, useMemo } from 'react';
+import React, { useState, useContext, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ProductContext } from '../context/ProductContext';
 import { SaleContext } from '../context/SaleContext';
@@ -10,12 +10,17 @@ const NuevoCliente = () => {
   const { addSale } = useContext(SaleContext);
   const { user } = useContext(AuthContext);
 
-  const categories = ['Panadería', 'Facturería', 'Repostería', 'Cafetería', 'Especialidades'];
-  const [activeCategory, setActiveCategory] = useState('Panadería');
+  // Extracción dinámica de categorías de los productos cargados
+  const categories = useMemo(() => {
+    const uniqueCats = Array.from(new Set(products.map((p) => p.category).filter(Boolean)));
+    return uniqueCats.length > 0 ? uniqueCats : ['General'];
+  }, [products]);
+
+  const [activeCategory, setActiveCategory] = useState(categories[0] || 'General');
+  const [activeSubcategory, setActiveSubcategory] = useState('Todas');
   const [selectedProduct, setSelectedProduct] = useState(null);
 
   const [activeTab, setActiveTab] = useState('catalog');
-  
   const [cart, setCart] = useState([]);
   const [sellMode, setSellMode] = useState('weight');
   const [quantity, setQuantity] = useState('');
@@ -23,13 +28,34 @@ const NuevoCliente = () => {
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [paymentStep, setPaymentStep] = useState('select_method');
   const [cashGiven, setCashGiven] = useState('');
-
-  // Estado para prevenir múltiples ejecuciones durante el cobro
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const categoryProducts = useMemo(() => {
-    return products.filter((p) => (p.category || 'Panadería') === activeCategory);
+  useEffect(() => {
+    if (categories.length > 0 && !categories.includes(activeCategory)) {
+      setActiveCategory(categories[0]);
+    }
+  }, [categories, activeCategory]);
+
+  // Subcategorías dinámicas filtradas por la categoría seleccionada
+  const subcategories = useMemo(() => {
+    const subCats = products
+      .filter((p) => (p.category || 'General') === activeCategory && p.subcategory)
+      .map((p) => p.subcategory);
+    return ['Todas', ...Array.from(new Set(subCats))];
   }, [products, activeCategory]);
+
+  useEffect(() => {
+    setActiveSubcategory('Todas');
+  }, [activeCategory]);
+
+  // Productos filtrados según Categoría y Subcategoría
+  const categoryProducts = useMemo(() => {
+    return products.filter((p) => {
+      const matchCat = (p.category || 'General') === activeCategory;
+      const matchSub = activeSubcategory === 'Todas' || p.subcategory === activeSubcategory;
+      return matchCat && matchSub;
+    });
+  }, [products, activeCategory, activeSubcategory]);
 
   const handleSelectProduct = (product) => {
     setSelectedProduct(product);
@@ -88,7 +114,8 @@ const NuevoCliente = () => {
       id: Date.now(),
       productId: selectedProduct._id || selectedProduct.id,
       name: selectedProduct.name,
-      category: selectedProduct.category || 'Panadería',
+      category: selectedProduct.category || 'General',
+      subcategory: selectedProduct.subcategory || '',
       mode: sellMode,
       quantityVal: val,
       unitPrice: calculatedSubtotal / (val || 1),
@@ -172,6 +199,14 @@ const NuevoCliente = () => {
           -webkit-overflow-scrolling: touch;
         }
 
+        .subcategory-bar {
+          display: flex;
+          gap: 6px;
+          overflow-x: auto;
+          padding: 4px 14px 8px 14px;
+          -webkit-overflow-scrolling: touch;
+        }
+
         .product-grid {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
@@ -212,7 +247,6 @@ const NuevoCliente = () => {
           background-color: #b91c1c;
         }
 
-        /* Animaciones para botones genéricos */
         button {
           transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.15s ease, box-shadow 0.1s ease;
           user-select: none;
@@ -243,7 +277,6 @@ const NuevoCliente = () => {
       <div className="header-nav">
         <button onClick={() => navigate('/caja')} style={styles.btnVolver}>← Salir a Caja</button>
         
-        {/* NAVEGACIÓN ENTRE PESTAÑAS */}
         <div style={{ display: 'flex', gap: '6px' }}>
           <button
             onClick={() => setActiveTab('catalog')}
@@ -268,9 +301,11 @@ const NuevoCliente = () => {
         </div>
       </div>
 
-      {/* PESTAÑA 1: CATÁLOGO DE PRODUCTOS */}
+      {/* PESTAÑA CATÁLOGO DE PRODUCTOS */}
       {activeTab === 'catalog' && (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          
+          {/* BARRA DE CATEGORÍAS */}
           <div className="category-bar">
             {categories.map((cat) => (
               <button
@@ -288,6 +323,26 @@ const NuevoCliente = () => {
             ))}
           </div>
 
+          {/* BARRA DE SUBCATEGORÍAS DINÁMICAS (SI EXISTEN) */}
+          {subcategories.length > 1 && (
+            <div className="subcategory-bar">
+              {subcategories.map((sub) => (
+                <button
+                  key={sub}
+                  onClick={() => setActiveSubcategory(sub)}
+                  style={{
+                    ...styles.subCategoryTab,
+                    backgroundColor: activeSubcategory === sub ? '#7f1d1d' : '#ffffff',
+                    color: activeSubcategory === sub ? '#ffffff' : '#991b1b',
+                    border: activeSubcategory === sub ? '1px solid #7f1d1d' : '1px solid #fca5a5'
+                  }}
+                >
+                  {sub}
+                </button>
+              ))}
+            </div>
+          )}
+
           <div className="product-grid">
             {categoryProducts.map((p) => {
               const prodId = p._id || p.id;
@@ -296,13 +351,13 @@ const NuevoCliente = () => {
                   {p.image ? <img src={p.image} alt={p.name} style={styles.cardImg} /> : <div style={styles.noCardImg}>🥐</div>}
                   <div style={styles.cardFooter}>
                     <span style={styles.cardTitle}>{p.name}</span>
+                    {p.subcategory && <span style={{ fontSize: '0.65rem', color: '#991b1b', marginTop: '2px' }}>{p.subcategory}</span>}
                   </div>
                 </div>
               );
             })}
           </div>
 
-          {/* BARRA FLOTANTE EN CATÁLOGO SI HAY PRODUCTOS EN CARRITO */}
           {cart.length > 0 && (
             <div className="bottom-floating-bar" onClick={() => setActiveTab('cart')}>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -315,7 +370,7 @@ const NuevoCliente = () => {
         </div>
       )}
 
-      {/* PESTAÑA 2: REVISIÓN DEL PEDIDO Y PAGOS */}
+      {/* PESTAÑA PEDIDO */}
       {activeTab === 'cart' && (
         <div className="cart-tab-view">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
@@ -424,7 +479,7 @@ const NuevoCliente = () => {
         </div>
       )}
 
-      {/* MODAL DE COBRO */}
+      {/* MODAL COBRO */}
       {showCheckoutModal && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalCard}>
@@ -478,7 +533,7 @@ const NuevoCliente = () => {
                   <button onClick={() => setCashGiven('10000')} style={styles.presetBtn} disabled={isSubmitting}>$10.000</button>
                 </div>
 
-                <div style={{ ...styles.subtotalDisplay, backgroundColor: (parseFloat(cashGiven) || 0) < totalCart ? '#fef2f2' : '#fef2f2' }}>
+                <div style={{ ...styles.subtotalDisplay, backgroundColor: '#fef2f2' }}>
                   <span style={{ fontSize: '1.1rem' }}>VUELTO:</span>
                   <strong style={{ fontSize: '1.8rem', color: (parseFloat(cashGiven) || 0) < totalCart ? '#991b1b' : '#dc2626' }}>
                     ${changeAmount.toFixed(2)}
@@ -528,11 +583,12 @@ const NuevoCliente = () => {
 
 const styles = {
   tabSwitchBtn: { padding: '8px 12px', borderRadius: '8px', border: 'none', fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer' },
-  categoryTab: { padding: '10px 14px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap' },
+  categoryTab: { padding: '8px 14px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap' },
+  subCategoryTab: { padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' },
   productCard: { backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #fca5a5', boxShadow: '0 2px 4px rgba(220, 38, 38, 0.08)', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', overflow: 'hidden', minHeight: '130px' },
   cardImg: { width: '100%', height: '85px', objectFit: 'cover' },
   noCardImg: { width: '100%', height: '85px', backgroundColor: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem' },
-  cardFooter: { padding: '6px', textAlign: 'center', width: '100%' },
+  cardFooter: { padding: '6px', textAlign: 'center', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' },
   cardTitle: { fontSize: '0.8rem', fontWeight: 'bold', color: '#7f1d1d', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' },
   btnVolver: { padding: '8px 12px', borderRadius: '6px', border: '1px solid #fca5a5', backgroundColor: '#fff', color: '#7f1d1d', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem' },
   btnVerPedido: { backgroundColor: '#ffffff', color: '#dc2626', border: 'none', padding: '10px 16px', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.9rem', cursor: 'pointer' },
