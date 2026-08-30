@@ -4,19 +4,19 @@ const mongoose = require('mongoose');
 require('dotenv').config();
 
 const User = require('./models/User');
-const Product = require('./models/Product'); // Requerido para actualizar stock
 
-// Importaciones directas de rutas
+// Importaciones de rutas
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const productRoutes = require('./routes/productRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const shiftRoutes = require('./routes/shiftRoutes');
 const supplierRoutes = require('./routes/supplierRoutes');
+const purchaseRoutes = require('./routes/purchaseRoutes');
+const expenseRoutes = require('./routes/expenseRoutes'); // 👈 Se agrega la ruta de egresos
 
 const app = express();
 
-// Configuración de CORS
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
@@ -36,7 +36,6 @@ app.use(cors({
   credentials: true
 }));
 
-// Middlewares para parseo de body e imágenes
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
@@ -65,48 +64,10 @@ app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/shifts', shiftRoutes);
 app.use('/api', supplierRoutes);
+app.use('/api/purchase-transactions', purchaseRoutes);
+app.use('/api/expenses', expenseRoutes); // 👈 Montado del endpoint de egresos/gastos
 
-// Endpoint /api/purchase-transactions para procesar ingresos e incrementar stock
-app.post('/api/purchase-transactions', async (req, res) => {
-  try {
-    const { supplierId, items, totalAmount, invoiceNumber, paymentMethod, notes } = req.body;
-
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ message: 'Se requiere al menos un producto para ingresar.' });
-    }
-
-    // Actualizar stock y costo de cada producto
-    for (const item of items) {
-      const product = await Product.findById(item.product);
-      if (product) {
-        const addedQty = parseFloat(item.quantity) || 0;
-        product.stock = (product.stock || 0) + addedQty;
-        if (item.unitCost) {
-          product.costPrice = parseFloat(item.unitCost);
-        }
-        await product.save();
-      }
-    }
-
-    return res.status(201).json({
-      message: 'Ingreso de mercadería y actualización de stock realizados con éxito',
-      transaction: {
-        supplierId,
-        items,
-        totalAmount,
-        invoiceNumber,
-        paymentMethod,
-        notes,
-        createdAt: new Date()
-      }
-    });
-  } catch (error) {
-    console.error('Error al procesar la transacción de compra:', error);
-    return res.status(500).json({ message: 'Error interno al registrar la compra', error: error.message });
-  }
-});
-
-// Función para inicializar la cuenta Admin
+// Inicialización del Admin
 const initAdmin = async () => {
   try {
     const adminEmail = (process.env.ADMIN_EMAIL || 'mgpanaderiayconfiteria@gmail.com').trim().toLowerCase();
@@ -135,7 +96,7 @@ const initAdmin = async () => {
   }
 };
 
-// Conexión a MongoDB Atlas
+// Conexión MongoDB
 const mongoUri = process.env.MONGO_URI;
 if (!mongoUri) {
   console.error('❌ ERROR CRÍTICO: Falta la variable MONGO_URI en el archivo .env');
@@ -148,18 +109,15 @@ if (!mongoUri) {
     .catch(err => console.error('Error al conectar a MongoDB:', err));
 }
 
-// Ruta raíz de prueba
 app.get('/', (req, res) => {
   res.send('API de Panadería funcionando 🚀');
 });
 
-// Capturador de rutas 404
 app.use((req, res, next) => {
   console.warn(`⚠️ [404] Ruta no encontrada: ${req.originalUrl}`);
   res.status(404).json({ message: `La ruta ${req.originalUrl} no existe en el servidor` });
 });
 
-// Manejador global de errores
 app.use((err, req, res, next) => {
   console.error('🔥 Error en el servidor:', err.message);
   res.status(500).json({ message: 'Error interno en el servidor', error: err.message });
