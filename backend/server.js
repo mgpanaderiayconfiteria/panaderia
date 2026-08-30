@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 require('dotenv').config();
 
 const User = require('./models/User');
+const Product = require('./models/Product'); // Requerido para actualizar stock
 
 // Importaciones directas de rutas
 const authRoutes = require('./routes/authRoutes');
@@ -11,7 +12,7 @@ const userRoutes = require('./routes/userRoutes');
 const productRoutes = require('./routes/productRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const shiftRoutes = require('./routes/shiftRoutes');
-const supplierRoutes = require('./routes/supplierRoutes'); // 👈 Importado
+const supplierRoutes = require('./routes/supplierRoutes');
 
 const app = express();
 
@@ -63,8 +64,47 @@ app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/shifts', shiftRoutes);
-app.use('/api', supplierRoutes); // 👈 Montado para proveedores y egresos (/api/suppliers y /api/expenses)
-app.use('/api/purchase-transactions', supplierRoutes); // 👈 Mapeo para procesar compras/ingresos de stock
+app.use('/api', supplierRoutes);
+
+// Endpoint /api/purchase-transactions para procesar ingresos e incrementar stock
+app.post('/api/purchase-transactions', async (req, res) => {
+  try {
+    const { supplierId, items, totalAmount, invoiceNumber, paymentMethod, notes } = req.body;
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: 'Se requiere al menos un producto para ingresar.' });
+    }
+
+    // Actualizar stock y costo de cada producto
+    for (const item of items) {
+      const product = await Product.findById(item.product);
+      if (product) {
+        const addedQty = parseFloat(item.quantity) || 0;
+        product.stock = (product.stock || 0) + addedQty;
+        if (item.unitCost) {
+          product.costPrice = parseFloat(item.unitCost);
+        }
+        await product.save();
+      }
+    }
+
+    return res.status(201).json({
+      message: 'Ingreso de mercadería y actualización de stock realizados con éxito',
+      transaction: {
+        supplierId,
+        items,
+        totalAmount,
+        invoiceNumber,
+        paymentMethod,
+        notes,
+        createdAt: new Date()
+      }
+    });
+  } catch (error) {
+    console.error('Error al procesar la transacción de compra:', error);
+    return res.status(500).json({ message: 'Error interno al registrar la compra', error: error.message });
+  }
+});
 
 // Función para inicializar la cuenta Admin
 const initAdmin = async () => {
