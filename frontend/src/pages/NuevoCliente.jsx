@@ -243,7 +243,7 @@ const NuevoCliente = () => {
           flex-direction: column;
           min-height: 100dvh;
           width: 100%;
-          background-color: transparent; /* Fondo transparente aplicado */
+          background-color: transparent;
           box-sizing: border-box;
           position: relative;
           padding-bottom: ${cart.length > 0 && activeTab === 'catalog' ? '70px' : '0px'};
@@ -542,7 +542,7 @@ const NuevoCliente = () => {
                 {sellMode === 'weight' && 'Ingrese gramos (ej: 250):'}
                 {sellMode === 'unit' && 'Ingrese cantidad de unidades:'}
                 {sellMode === 'portion' && 'Ingrese cantidad de porciones:'}
-                {sellMode === 'amount' && 'Ingrese monto exacto in $:'}
+                {sellMode === 'amount' && 'Ingrese monto exacto en $:'}
               </label>
               <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="0" autoFocus style={styles.touchInput} />
             </div>
