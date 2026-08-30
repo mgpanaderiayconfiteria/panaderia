@@ -64,6 +64,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/shifts', shiftRoutes);
 app.use('/api', supplierRoutes); // 👈 Montado para proveedores y egresos (/api/suppliers y /api/expenses)
+app.use('/api/purchase-transactions', supplierRoutes); // 👈 Mapeo para procesar compras/ingresos de stock
 
 // Función para inicializar la cuenta Admin
 const initAdmin = async () => {
