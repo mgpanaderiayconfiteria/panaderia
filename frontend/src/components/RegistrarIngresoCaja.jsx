@@ -9,7 +9,9 @@ const RegistrarIngresoCaja = ({ onClose }) => {
   const [suppliers, setSuppliers] = useState([]);
   const [selectedSupplierId, setSelectedSupplierId] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
-  const [notes, setNotes] = useState('');
+  
+  // Opciones: 'Efectivo', 'Transferencia' o 'Pendiente'
+  const [paymentMethod, setPaymentMethod] = useState('Efectivo');
   
   const [items, setItems] = useState([
     { productId: '', quantity: '', unitCost: '', subtotal: 0 }
@@ -43,14 +45,12 @@ const RegistrarIngresoCaja = ({ onClose }) => {
     setItems(updated);
   };
 
-  // Recalcular el subtotal considerando el tipo de venta (peso en gr o unidades)
   const calculateSubtotal = (prod, qtyVal, costVal) => {
     const qty = parseFloat(qtyVal) || 0;
     const cost = parseFloat(costVal) || 0;
 
     if (!prod) return 0;
 
-    // Si se vende por peso y el valor ingresado es en gramos (ej. 5000 gr = 5 kg)
     if (prod.allowByWeight) {
       return (qty / 1000) * cost;
     }
@@ -65,9 +65,8 @@ const RegistrarIngresoCaja = ({ onClose }) => {
     updated[index].productId = productId;
 
     if (selectedProd) {
-      // Obtener costo asignado en el modelo (soporta cost, costPrice o price)
-      const baseCost = selectedProd.cost || selectedProd.costPrice || selectedProd.price || 0;
-      updated[index].unitCost = baseCost.toString();
+      const baseCost = selectedProd.costPrice ?? selectedProd.cost ?? selectedProd.price ?? 0;
+      updated[index].unitCost = baseCost > 0 ? baseCost.toString() : '';
       updated[index].subtotal = calculateSubtotal(selectedProd, updated[index].quantity, baseCost);
     } else {
       updated[index].unitCost = '';
@@ -110,7 +109,6 @@ const RegistrarIngresoCaja = ({ onClose }) => {
         return;
       }
 
-      // Convertir gramos a Kilos para el guardado en backend
       const rawQty = parseFloat(item.quantity);
       const finalQuantity = prod.allowByWeight ? rawQty / 1000 : rawQty;
 
@@ -135,7 +133,9 @@ const RegistrarIngresoCaja = ({ onClose }) => {
       items: formattedItems,
       totalAmount,
       invoiceNumber,
-      notes
+      paymentMethod, // 'Efectivo', 'Transferencia' o 'Pendiente'
+      isPaid: paymentMethod !== 'Pendiente', // Ayuda al backend a saber si hubo movimiento de dinero
+      notes: paymentMethod === 'Pendiente' ? 'Entrega recibida - Pago pendiente' : `Pago mediante ${paymentMethod}`
     };
 
     try {
@@ -184,11 +184,11 @@ const RegistrarIngresoCaja = ({ onClose }) => {
           display: grid;
           grid-template-columns: 1fr;
           gap: 8px;
-          background: #ffffff;
+          background: #f8fafc;
           padding: 10px;
-          border-radius: 6px;
+          border-radius: 8px;
           border: 1px solid #cbd5e1;
-          margin-bottom: 8px;
+          margin-bottom: 10px;
         }
 
         .inputs-group {
@@ -198,17 +198,53 @@ const RegistrarIngresoCaja = ({ onClose }) => {
           align-items: center;
         }
 
+        .payment-toggle {
+          display: flex;
+          gap: 8px;
+          margin-top: 4px;
+          flex-wrap: wrap;
+        }
+
+        .btn-payment {
+          flex: 1;
+          min-width: 100px;
+          padding: 10px 8px;
+          border-radius: 8px;
+          border: 2px solid #cbd5e1;
+          background-color: #f1f5f9;
+          color: #475569;
+          font-weight: bold;
+          font-size: 0.85rem;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          text-align: center;
+        }
+
+        .btn-payment.active-efectivo {
+          background-color: #16a34a;
+          border-color: #15803d;
+          color: #ffffff;
+        }
+
+        .btn-payment.active-transferencia {
+          background-color: #2563eb;
+          border-color: #1d4ed8;
+          color: #ffffff;
+        }
+
+        .btn-payment.active-pendiente {
+          background-color: #d97706;
+          border-color: #b45309;
+          color: #ffffff;
+        }
+
         @media (min-width: 550px) {
           .header-row {
             grid-template-columns: 1fr 1fr;
           }
           .item-row {
-            grid-template-columns: 2fr 2fr;
+            grid-template-columns: 2fr 2.5fr;
             align-items: center;
-            background: transparent;
-            padding: 4px 0;
-            border: none;
-            margin-bottom: 0;
           }
         }
       `}</style>
@@ -258,39 +294,51 @@ const RegistrarIngresoCaja = ({ onClose }) => {
               const selectedProd = products.find(p => p._id === item.productId);
               return (
                 <div key={index} className="item-row">
-                  <select
-                    value={item.productId}
-                    onChange={(e) => handleProductSelect(index, e.target.value)}
-                    required
-                    style={styles.input}
-                  >
-                    <option value="">-- Producto --</option>
-                    {products.map(p => (
-                      <option key={p._id} value={p._id}>
-                        {p.name} ({p.category})
-                      </option>
-                    ))}
-                  </select>
+                  <div>
+                    <select
+                      value={item.productId}
+                      onChange={(e) => handleProductSelect(index, e.target.value)}
+                      required
+                      style={styles.input}
+                    >
+                      <option value="">-- Producto --</option>
+                      {products.map(p => (
+                        <option key={p._id} value={p._id}>
+                          {p.name} {p.allowByWeight ? '(Por Peso/Kg)' : '(Por Unidad)'}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
                   <div className="inputs-group">
-                    <input
-                      type="number"
-                      placeholder={selectedProd?.allowByWeight ? 'Gramos (Ej: 5000)' : 'Cant'}
-                      value={item.quantity}
-                      onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                      required
-                      style={styles.input}
-                    />
+                    <div>
+                      <input
+                        type="number"
+                        placeholder={selectedProd?.allowByWeight ? 'Gramos' : 'Cant'}
+                        value={item.quantity}
+                        onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                        required
+                        style={styles.input}
+                      />
+                      <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                        {selectedProd?.allowByWeight ? 'Ej: 5000 gr' : 'Unidades'}
+                      </span>
+                    </div>
 
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder={selectedProd?.allowByWeight ? 'Costo / Kg' : 'Costo u.'}
-                      value={item.unitCost}
-                      onChange={(e) => handleItemChange(index, 'unitCost', e.target.value)}
-                      required
-                      style={styles.input}
-                    />
+                    <div>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="Costo Nuevo"
+                        value={item.unitCost}
+                        onChange={(e) => handleItemChange(index, 'unitCost', e.target.value)}
+                        required
+                        style={{ ...styles.input, fontWeight: 'bold', color: '#1e293b' }}
+                      />
+                      <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                        {selectedProd?.allowByWeight ? '$ / Kg' : '$ / Unid'}
+                      </span>
+                    </div>
 
                     <div style={styles.subtotalText}>
                       ${item.subtotal.toFixed(2)}
@@ -311,19 +359,38 @@ const RegistrarIngresoCaja = ({ onClose }) => {
             </button>
           </div>
 
-          <label style={styles.label}>
-            Observaciones:
-            <input
-              type="text"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Ej: Pago en efectivo desde la caja chica"
-              style={styles.input}
-            />
-          </label>
+          {/* Opciones de Estado de Pago */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#334155' }}>
+              Estado del Pago:
+            </span>
+            <div className="payment-toggle">
+              <button
+                type="button"
+                className={`btn-payment ${paymentMethod === 'Efectivo' ? 'active-efectivo' : ''}`}
+                onClick={() => setPaymentMethod('Efectivo')}
+              >
+                💵 Efectivo
+              </button>
+              <button
+                type="button"
+                className={`btn-payment ${paymentMethod === 'Transferencia' ? 'active-transferencia' : ''}`}
+                onClick={() => setPaymentMethod('Transferencia')}
+              >
+                💳 Transferencia
+              </button>
+              <button
+                type="button"
+                className={`btn-payment ${paymentMethod === 'Pendiente' ? 'active-pendiente' : ''}`}
+                onClick={() => setPaymentMethod('Pendiente')}
+              >
+                ⏳ A Cuenta (Pendiente)
+              </button>
+            </div>
+          </div>
 
           <div style={styles.totalBox}>
-            <span>TOTAL SALIDA DE CAJA:</span>
+            <span>TOTAL VALORIZADO:</span>
             <strong>${totalAmount.toFixed(2)}</strong>
           </div>
 
@@ -344,8 +411,8 @@ const styles = {
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' },
   btnClose: { background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b' },
   form: { display: 'flex', flexDirection: 'column', gap: '12px' },
-  itemsContainer: { display: 'flex', flexDirection: 'column', gap: '6px', background: '#f8fafc', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' },
-  subtotalText: { minWidth: '70px', textAlign: 'right', fontWeight: 'bold', fontSize: '0.85rem', color: '#0f172a' },
+  itemsContainer: { display: 'flex', flexDirection: 'column', gap: '6px' },
+  subtotalText: { minWidth: '65px', textAlign: 'right', fontWeight: 'bold', fontSize: '0.85rem', color: '#0f172a' },
   label: { fontSize: '0.85rem', fontWeight: 'bold', color: '#334155', display: 'flex', flexDirection: 'column', gap: '4px' },
   input: { padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', width: '100%', boxSizing: 'border-box' },
   btnAddItem: { alignSelf: 'flex-start', padding: '8px 12px', fontSize: '0.8rem', background: '#e2e8f0', border: 'none', borderRadius: '6px', cursor: 'pointer', marginTop: '4px', fontWeight: 'bold' },
