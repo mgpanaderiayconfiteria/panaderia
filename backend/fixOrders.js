@@ -2,7 +2,6 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 
-// Obtener la URI desde el archivo .env
 const MONGO_URI = process.env.MONGO_URI;
 
 if (!MONGO_URI) {
@@ -10,39 +9,117 @@ if (!MONGO_URI) {
   process.exit(1);
 }
 
-// Esquema de la orden
+// 1. Modelo de Producto flexible para leer todas sus configuraciones
+const productSchema = new mongoose.Schema({
+  name: String,
+  category: String,
+  allowByUnit: Boolean,
+  allowByWeight: Boolean,
+  allowByPorcion: Boolean,
+  allowByAmount: Boolean,
+  priceUnit: Number,
+  priceKg: Number,
+  priceHalfDozen: Number,
+  priceDozen: Number,
+  pricePorcion: Number,
+  price: Number
+}, { strict: false });
+
+const Product = mongoose.model('Product', productSchema);
+
+// 2. Modelo de Orden
 const orderSchema = new mongoose.Schema({
   items: [{
     product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
-    name: { type: String },
-    price: { type: Number },
-    quantity: { type: Number },
-    mode: { type: String },
-    detailLabel: { type: String },
-    subtotal: { type: Number }
+    name: String,
+    price: Number,
+    quantity: Number,
+    mode: String,
+    detailLabel: String,
+    subtotal: Number
   }],
-  subtotal: { type: Number },
-  discountAmount: { type: Number },
-  isCashDiscountApplied: { type: Boolean },
-  total: { type: Number },
-  paidAmount: { type: Number },
-  changeAmount: { type: Number },
-  paymentMethod: { type: String },
-  seller: { type: mongoose.Schema.Types.ObjectId },
-  employee: { type: String },
-  status: { type: String }
+  subtotal: Number,
+  discountAmount: Number,
+  isCashDiscountApplied: Boolean,
+  total: Number,
+  paidAmount: Number,
+  changeAmount: Number,
+  paymentMethod: String,
+  status: String
 }, { timestamps: true });
 
 const Order = mongoose.model('Order', orderSchema);
+
+// 3. Función para calcular el subtotal del ítem consultando la configuración real del producto
+function calculateItemSubtotal(item, product) {
+  const mode = item.mode || 'unit';
+  const qty = parseFloat(item.quantity || 0);
+
+  // Si no se encuentra el producto en BD, usamos los valores guardados en el ítem
+  const priceKg = parseFloat(product?.priceKg || product?.price || item.price || 0);
+  const priceUnit = parseFloat(product?.priceUnit || product?.price || item.price || 0);
+  const priceHalfDozen = parseFloat(product?.priceHalfDozen || 0);
+  const priceDozen = parseFloat(product?.priceDozen || 0);
+
+  // CASO A: Venta por Monto Fijo ($) -> Se respeta el monto ingresado
+  if (mode === 'amount' || (item.subtotal > 0 && item.detailLabel?.includes('$'))) {
+    return parseFloat(item.subtotal || item.price || 0);
+  }
+
+  // CASO B: Venta por Peso (Gramos o Kilos)
+  if (mode === 'weight' || mode === 'kg' || product?.allowByWeight) {
+    if (priceKg <= 0) return parseFloat(item.subtotal || 0);
+    // Si qty es mayor o igual a 5, asumimos que son gramos (ej: 350g). Si no, kilos (ej: 0.35kg)
+    const grams = qty >= 5 ? qty : qty * 1000;
+    return (priceKg / 1000) * grams;
+  }
+
+  // CASO C: Venta por Unidades con Promociones/Escalas (Docena / Media Docena)
+  if (priceDozen > 0 || priceHalfDozen > 0) {
+    let subtotal = 0;
+    let unidadesRestantes = qty;
+
+    // Docenas completas
+    if (priceDozen > 0 && unidadesRestantes >= 12) {
+      const docenas = Math.floor(unidadesRestantes / 12);
+      subtotal += docenas * priceDozen;
+      unidadesRestantes %= 12;
+    }
+
+    // Media docena sobrante
+    if (priceHalfDozen > 0 && unidadesRestantes >= 6) {
+      subtotal += priceHalfDozen;
+      unidadesRestantes -= 6;
+    }
+
+    // Unidades individuales restantes
+    if (unidadesRestantes > 0) {
+      subtotal += unidadesRestantes * priceUnit;
+    }
+
+    return subtotal;
+  }
+
+  // CASO D: Venta Simple por Unidad
+  return priceUnit * qty;
+}
 
 async function fixOrders() {
   try {
     console.log('🔌 Conectando a MongoDB Atlas...');
     await mongoose.connect(MONGO_URI);
-    console.log('✅ Conexión exitosa a la base de datos.');
+    console.log('✅ Conexión exitosa.');
+
+    // Cargar productos en memoria para cruce rápido
+    const dbProducts = await Product.find({});
+    const productMap = new Map();
+    dbProducts.forEach(p => {
+      productMap.set(p._id.toString(), p);
+      if (p.name) productMap.set(p.name.trim().toLowerCase(), p);
+    });
 
     const orders = await Order.find({});
-    console.log(`📦 Se encontraron ${orders.length} órdenes en total. Iniciando auditoría...`);
+    console.log(`📦 Auditando ${orders.length} órdenes basándonos en las reglas de cada producto...\n`);
 
     let fixedCount = 0;
 
@@ -50,34 +127,18 @@ async function fixOrders() {
       let orderModified = false;
       let newSubtotal = 0;
 
-      // 1. Auditamos y recalculamos cada ítem de la orden
       if (Array.isArray(order.items) && order.items.length > 0) {
         order.items.forEach((item) => {
-          let itemSubtotal = 0;
-          const price = parseFloat(item.price || 0);
-          const qty = parseFloat(item.quantity || 0);
-          const mode = item.mode || 'unit';
+          const prodIdStr = item.product ? item.product.toString() : '';
+          const itemNameNorm = item.name ? item.name.trim().toLowerCase() : '';
+          
+          // Buscar producto en la BD por ID o Nombre
+          const product = productMap.get(prodIdStr) || productMap.get(itemNameNorm);
 
-          // A) Si el item ya tenía un subtotal válido y coherente
-          if (item.subtotal !== undefined && item.subtotal !== null && !isNaN(item.subtotal) && item.subtotal > 0) {
-            itemSubtotal = parseFloat(item.subtotal);
-          } 
-          // B) Si es venta por peso/kilo
-          else if (mode === 'weight' || mode === 'kg') {
-            // Si el precio guardado es por Kilo (ej: $2500) y la cantidad está en Gramos (ej: 250g)
-            if (price > 50 && qty >= 10) {
-              itemSubtotal = (price / 1000) * qty;
-            } else {
-              // Si el precio ya era por Gramo (ej: $2.5/g * 250g)
-              itemSubtotal = price * qty;
-            }
-          } 
-          // C) Unidades o Porciones
-          else {
-            itemSubtotal = price * qty;
-          }
+          // Calcular el subtotal correcto consultando el modelo del producto
+          let itemSubtotal = calculateItemSubtotal(item, product);
+          itemSubtotal = Math.round(itemSubtotal * 100) / 100;
 
-          // Si el subtotal guardado difiere del calculado, lo actualizamos
           if (Math.abs((item.subtotal || 0) - itemSubtotal) > 0.01) {
             item.subtotal = itemSubtotal;
             orderModified = true;
@@ -86,65 +147,62 @@ async function fixOrders() {
           newSubtotal += itemSubtotal;
         });
       } else {
-        // Fallback si la orden no tenía arreglo de ítems
         newSubtotal = parseFloat(order.subtotal || order.total || 0);
       }
 
-      // 2. Verificar y corregir subtotal general de la orden
+      newSubtotal = Math.round(newSubtotal * 100) / 100;
+
+      // Actualizar Subtotal General
       if (Math.abs((order.subtotal || 0) - newSubtotal) > 0.01) {
         order.subtotal = newSubtotal;
         orderModified = true;
       }
 
-      // 3. Recalcular Descuento del 10% para Efectivo
+      // Descuento en Efectivo (10%)
       let newDiscount = parseFloat(order.discountAmount || 0);
       const isCash = (order.paymentMethod || 'efectivo') === 'efectivo';
 
       if (order.isCashDiscountApplied || (isCash && newDiscount > 0)) {
-        const expectedDiscount = newSubtotal * 0.10;
-        if (Math.abs(newDiscount - expectedDiscount) > 0.01) {
-          newDiscount = expectedDiscount;
-          order.discountAmount = newDiscount;
-          order.isCashDiscountApplied = true;
-          orderModified = true;
-        }
+        newDiscount = Math.round((newSubtotal * 0.10) * 100) / 100;
+        order.discountAmount = newDiscount;
+        order.isCashDiscountApplied = true;
+        orderModified = true;
       } else {
+        newDiscount = 0;
         if (order.discountAmount !== 0) {
           order.discountAmount = 0;
           orderModified = true;
         }
-        newDiscount = 0;
       }
 
-      // 4. Recalcular Total Final
-      const newTotal = Math.max(0, newSubtotal - newDiscount);
+      // Total Final
+      const newTotal = Math.max(0, Math.round((newSubtotal - newDiscount) * 100) / 100);
       if (Math.abs((order.total || 0) - newTotal) > 0.01) {
         order.total = newTotal;
         orderModified = true;
       }
 
-      // 5. Recalcular Vuelto
+      // Vuelto
       const paid = parseFloat(order.paidAmount || newTotal);
-      const newChange = isCash ? Math.max(0, paid - newTotal) : 0;
+      const newChange = isCash ? Math.max(0, Math.round((paid - newTotal) * 100) / 100) : 0;
       if (Math.abs((order.changeAmount || 0) - newChange) > 0.01) {
         order.changeAmount = newChange;
         orderModified = true;
       }
 
-      // Guardar únicamente si se detectó algún desfasaje
       if (orderModified) {
         await order.save();
         fixedCount++;
-        console.log(`🛠️ Orden ${order._id} corregida -> Subtotal: $${newSubtotal.toFixed(2)} | Total: $${newTotal.toFixed(2)}`);
+        console.log(`🛠️ Orden ${order._id} recalculada -> Subtotal: $${newSubtotal} | Total: $${newTotal}`);
       }
     }
 
-    console.log(`\n🎉 ¡Proceso completado con éxito! Se auditaron ${orders.length} órdenes y se corrigieron ${fixedCount} desfasadas.`);
+    console.log(`\n🎉 ¡Finalizado! Se procesaron ${fixedCount} órdenes sincronizadas con los modelos de productos.`);
     await mongoose.disconnect();
     process.exit(0);
 
   } catch (error) {
-    console.error('❌ Error durante la corrección de órdenes:', error);
+    console.error('❌ Error en el proceso:', error);
     process.exit(1);
   }
 }

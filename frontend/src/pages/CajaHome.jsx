@@ -196,7 +196,7 @@ const CajaHome = () => {
           min-height: 100dvh;
           padding: 12px;
           box-sizing: border-box;
-          background-color: #fef2f2;
+          background-color: #ffffff; /* Modificado: antes #fef2f2 */
         }
 
         .top-info-bar {
@@ -309,7 +309,7 @@ const CajaHome = () => {
           display: flex;
           flex-direction: column;
           gap: 12px;
-          box-shadow: 0 20px 25px -5px rgba(153, 27, 27, 0.3);
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
           box-sizing: border-box;
           border-top: 5px solid #dc2626;
         }
@@ -322,7 +322,7 @@ const CajaHome = () => {
           border-radius: 16px;
           display: flex;
           flex-direction: column;
-          box-shadow: 0 20px 25px -5px rgba(153, 27, 27, 0.3);
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
           overflow: hidden;
         }
       `}</style>
@@ -556,7 +556,7 @@ const CajaHome = () => {
 
               <hr style={{ border: 'none', borderTop: '1px solid #fca5a5', margin: '4px 0' }} />
 
-              <div style={{ ...styles.resumenRow, backgroundColor: '#fef2f2', padding: '6px 8px', borderRadius: '6px' }}>
+              <div style={{ ...styles.resumenRow, backgroundColor: '#ffffff', padding: '6px 8px', borderRadius: '6px', border: '1px solid #fca5a5' }}>
                 <span style={{ fontWeight: 'bold', color: '#991b1b' }}>EFECTIVO ESPERADO EN CAJA:</span>
                 <strong style={{ fontSize: '1rem', color: '#991b1b' }}>${efectivoEsperadoEnCaja.toFixed(2)}</strong>
               </div>
@@ -582,7 +582,7 @@ const CajaHome = () => {
                   fontSize: '0.8rem',
                   fontWeight: 'bold',
                   textAlign: 'center',
-                  backgroundColor: diferenciaCaja === 0 ? '#fef2f2' : diferenciaCaja > 0 ? '#fff1f2' : '#fef2f2',
+                  backgroundColor: '#ffffff',
                   color: diferenciaCaja === 0 ? '#991b1b' : diferenciaCaja > 0 ? '#be123c' : '#dc2626',
                   border: `1px solid ${diferenciaCaja === 0 ? '#fca5a5' : diferenciaCaja > 0 ? '#fecdd3' : '#fecaca'}`
                 }}>
@@ -609,7 +609,7 @@ const CajaHome = () => {
 
 const styles = {
   btnLinkEdit: { background: 'none', border: 'none', color: '#ffffff', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.85rem', padding: 0, fontWeight: 'bold' },
-  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(127, 29, 29, 0.65)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '12px' },
+  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '12px' }, /* Modificado: antes rgba(127, 29, 29, 0.65) */
   modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '6px', borderBottom: '1px solid #fca5a5' },
   btnCloseModal: { backgroundColor: '#fecaca', color: '#991b1b', border: 'none', padding: '6px 10px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.8rem' },
   modalBody: { padding: '10px', overflowY: 'auto', flex: 1 },
