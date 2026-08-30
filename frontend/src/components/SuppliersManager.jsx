@@ -3,9 +3,10 @@ import React, { useState, useEffect } from 'react';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const SuppliersManager = () => {
-  const [activeSubTab, setActiveSubTab] = useState('expenses'); // 'expenses' | 'suppliers'
+  const [activeSubTab, setActiveSubTab] = useState('expenses'); // 'expenses' | 'suppliers' | 'debts'
   const [suppliers, setSuppliers] = useState([]);
   const [expenses, setExpenses] = useState([]);
+  const [purchases, setPurchases] = useState([]);
 
   // Formulario Proveedor
   const [supplierForm, setSupplierForm] = useState({ name: '', cuit: '', phone: '', category: '' });
@@ -23,6 +24,7 @@ const SuppliersManager = () => {
   useEffect(() => {
     fetchSuppliers();
     fetchExpenses();
+    fetchPurchases();
   }, []);
 
   const fetchSuppliers = async () => {
@@ -40,6 +42,15 @@ const SuppliersManager = () => {
       if (res.ok) setExpenses(await res.json());
     } catch (err) {
       console.error('Error cargando egresos:', err);
+    }
+  };
+
+  const fetchPurchases = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/purchase-transactions`);
+      if (res.ok) setPurchases(await res.json());
+    } catch (err) {
+      console.error('Error cargando compras:', err);
     }
   };
 
@@ -73,16 +84,60 @@ const SuppliersManager = () => {
         alert('Egreso / Factura registrada con éxito.');
         setExpenseForm({ supplierId: '', description: '', amount: '', paymentMethod: 'transferencia', invoiceNumber: '', category: 'Materia Prima' });
         fetchExpenses();
+        fetchPurchases();
       }
     } catch (err) {
       alert('Error al registrar el egreso');
     }
   };
 
+  // Marcar una compra "A Cuenta" como pagada
+  const handleMarkAsPaid = async (purchaseId) => {
+    if (!window.confirm('¿Confirmas que este remito/compra fue abonado?')) return;
+    try {
+      const res = await fetch(`${API_URL}/api/purchase-transactions/${purchaseId}/pay`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (res.ok) {
+        alert('Ingreso marcado como pagado.');
+        fetchPurchases();
+      }
+    } catch (err) {
+      alert('Error al actualizar el estado de pago');
+    }
+  };
+
+  // Agrupación de saldos pendientes por proveedor
+  const getSupplierDebts = () => {
+    const summary = {};
+
+    purchases.forEach((p) => {
+      const supName = p.supplierName || 'Proveedor General';
+      if (!summary[supName]) {
+        summary[supName] = { totalPurchased: 0, totalPending: 0, pendingCount: 0 };
+      }
+      summary[supName].totalPurchased += p.totalAmount || 0;
+
+      if (p.paymentMethod === 'Pendiente' || p.isPaid === false) {
+        summary[supName].totalPending += p.totalAmount || 0;
+        summary[supName].pendingCount += 1;
+      }
+    });
+
+    return Object.keys(summary).map((key) => ({
+      name: key,
+      ...summary[key]
+    }));
+  };
+
+  const supplierDebts = getSupplierDebts();
+  const totalDebtAll = supplierDebts.reduce((acc, curr) => acc + curr.totalPending, 0);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Selector SubPestañas */}
-      <div style={{ display: 'flex', gap: '10px' }}>
+      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
         <button
           onClick={() => setActiveSubTab('expenses')}
           style={{
@@ -90,12 +145,26 @@ const SuppliersManager = () => {
             borderRadius: '6px',
             border: 'none',
             backgroundColor: activeSubTab === 'expenses' ? '#0f2337' : '#cbd5e1',
-            color: '#fff',
+            color: activeSubTab === 'expenses' ? '#fff' : '#1e293b',
             fontWeight: 'bold',
             cursor: 'pointer'
           }}
         >
           🧾 Facturas y Gastos
+        </button>
+        <button
+          onClick={() => setActiveSubTab('debts')}
+          style={{
+            padding: '8px 16px',
+            borderRadius: '6px',
+            border: 'none',
+            backgroundColor: activeSubTab === 'debts' ? '#0f2337' : '#cbd5e1',
+            color: activeSubTab === 'debts' ? '#fff' : '#1e293b',
+            fontWeight: 'bold',
+            cursor: 'pointer'
+          }}
+        >
+          📊 Cuentas Corrientes / Deudas {totalDebtAll > 0 && `($${totalDebtAll.toFixed(2)})`}
         </button>
         <button
           onClick={() => setActiveSubTab('suppliers')}
@@ -104,7 +173,7 @@ const SuppliersManager = () => {
             borderRadius: '6px',
             border: 'none',
             backgroundColor: activeSubTab === 'suppliers' ? '#0f2337' : '#cbd5e1',
-            color: '#fff',
+            color: activeSubTab === 'suppliers' ? '#fff' : '#1e293b',
             fontWeight: 'bold',
             cursor: 'pointer'
           }}
@@ -113,7 +182,85 @@ const SuppliersManager = () => {
         </button>
       </div>
 
-      {activeSubTab === 'suppliers' ? (
+      {activeSubTab === 'debts' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Tarjeta Resumen General */}
+          <div style={styles.card}>
+            <h2 style={styles.cardTitle}>RESUMEN DE DEUDAS POR PROVEEDOR</h2>
+            <table style={styles.table}>
+              <thead>
+                <tr style={styles.trHead}>
+                  <th style={styles.th}>Proveedor</th>
+                  <th style={styles.th}>Comprobantes Pendientes</th>
+                  <th style={styles.th}>Total Comprado ($)</th>
+                  <th style={styles.th}>Deuda Acumulada ($)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {supplierDebts.map((s, idx) => (
+                  <tr key={idx} style={styles.trBody}>
+                    <td style={styles.td}><strong>{s.name}</strong></td>
+                    <td style={styles.td}>{s.pendingCount} remitos</td>
+                    <td style={styles.td}>${s.totalPurchased.toFixed(2)}</td>
+                    <td style={{ ...styles.td, color: s.totalPending > 0 ? '#dc2626' : '#16a34a', fontWeight: 'bold' }}>
+                      ${s.totalPending.toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Historial Individual de Ingresos Pendientes / A Cuenta */}
+          <div style={styles.card}>
+            <h2 style={styles.cardTitle}>DETALLE DE INGRESOS A CUENTA (PENDIENTES DE PAGO)</h2>
+            <table style={styles.table}>
+              <thead>
+                <tr style={styles.trHead}>
+                  <th style={styles.th}>Fecha</th>
+                  <th style={styles.th}>Proveedor</th>
+                  <th style={styles.th}>N° Remito / Factura</th>
+                  <th style={styles.th}>Estado</th>
+                  <th style={styles.th}>Monto Total ($)</th>
+                  <th style={styles.th}>Acción</th>
+                </tr>
+              </thead>
+              <tbody>
+                {purchases
+                  .filter((p) => p.paymentMethod === 'Pendiente' || p.isPaid === false)
+                  .map((p) => (
+                    <tr key={p._id || p.id} style={styles.trBody}>
+                      <td style={styles.td}>{new Date(p.createdAt || Date.now()).toLocaleDateString('es-AR')}</td>
+                      <td style={styles.td}><strong>{p.supplierName}</strong></td>
+                      <td style={styles.td}>{p.invoiceNumber || '-'}</td>
+                      <td style={{ ...styles.td, color: '#d97706', fontWeight: 'bold' }}>⏳ A Cuenta</td>
+                      <td style={{ ...styles.td, color: '#dc2626', fontWeight: 'bold' }}>
+                        ${parseFloat(p.totalAmount || 0).toFixed(2)}
+                      </td>
+                      <td style={styles.td}>
+                        <button
+                          onClick={() => handleMarkAsPaid(p._id || p.id)}
+                          style={{
+                            backgroundColor: '#16a34a',
+                            color: '#fff',
+                            border: 'none',
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold'
+                          }}
+                        >
+                          ✓ Marcar Pagado
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : activeSubTab === 'suppliers' ? (
         <div style={styles.card}>
           <h2 style={styles.cardTitle}>REGISTRAR NUEVO PROVEEDOR</h2>
           <form onSubmit={handleAddSupplier} style={styles.formGrid}>
