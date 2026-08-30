@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { createOrder, getOrders, deleteOrder } = require('../controllers/orderController'); // <--- Importamos deleteOrder
+// Importamos cancelOrder (o deleteOrder como fallback)
+const { createOrder, getOrders, getOrderById, getDailySummary, cancelOrder, deleteOrder } = require('../controllers/orderController');
+
+// Definir handler para eliminar/cancelar sin importar cómo esté nombrado en el controlador
+const handleDelete = cancelOrder || deleteOrder;
 
 // Intentar cargar middleware de autenticación con fallback seguro
 let protect = (req, res, next) => next();
@@ -19,8 +23,11 @@ try {
   }
 }
 
+// Rutas
 router.post('/', protect, createOrder);
 router.get('/', protect, getOrders);
-router.delete('/:id', protect, deleteOrder); // <--- Nueva ruta DELETE
+if (getDailySummary) router.get('/summary/daily', protect, getDailySummary);
+if (getOrderById) router.get('/:id', protect, getOrderById);
+if (handleDelete) router.delete('/:id', protect, handleDelete);
 
 module.exports = router;
