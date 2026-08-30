@@ -71,10 +71,10 @@ const NuevoCliente = () => {
   const calculatedSubtotal = useMemo(() => {
     if (!selectedProduct || !quantity || isNaN(parseFloat(quantity))) return 0;
     const val = parseFloat(quantity);
-    const basePrice = parseFloat(selectedProduct.price || selectedProduct.priceUnit || selectedProduct.priceKg || 0);
+    const basePrice = parseFloat(selectedProduct.priceKg || selectedProduct.price || selectedProduct.priceUnit || 0);
 
     if (sellMode === 'unit') {
-      const unitPrice = parseFloat(selectedProduct.priceUnit || basePrice);
+      const unitPrice = parseFloat(selectedProduct.priceUnit || selectedProduct.price || basePrice);
       const priceHalf = parseFloat(selectedProduct.priceHalfDozen || 0);
       const priceDozen = parseFloat(selectedProduct.priceDozen || 0);
 
@@ -93,50 +93,63 @@ const NuevoCliente = () => {
   const handleAddToCart = () => {
     if (!selectedProduct || calculatedSubtotal <= 0) return;
     let detailLabel = '';
-    let finalQtyGrams = parseFloat(quantity);
+    let finalQty = parseFloat(quantity);
     let finalMode = sellMode;
+    let calculatedPrice = 0;
 
     const basePriceKg = parseFloat(selectedProduct.priceKg || selectedProduct.price || 0);
 
     if (sellMode === 'unit') {
       const val = parseFloat(quantity);
+      const unitPrice = parseFloat(selectedProduct.priceUnit || selectedProduct.price || basePriceKg);
       const priceHalf = parseFloat(selectedProduct.priceHalfDozen || 0);
       const priceDozen = parseFloat(selectedProduct.priceDozen || 0);
 
       if (val === 6 && priceHalf > 0) {
         detailLabel = '1/2 Docena (6 un)';
+        calculatedPrice = priceHalf / 6;
       } else if (val === 12 && priceDozen > 0) {
         detailLabel = '1 Docena (12 un)';
+        calculatedPrice = priceDozen / 12;
       } else {
         detailLabel = `${val} un`;
+        calculatedPrice = unitPrice;
       }
     } else if (sellMode === 'weight') {
       const val = parseFloat(quantity);
       detailLabel = `${val} gr (${(val / 1000).toFixed(2)} kg)`;
+      // Precio por gramo (ej: 14000 / 1000 = 14)
+      calculatedPrice = basePriceKg > 0 ? basePriceKg / 1000 : 0;
     } else if (sellMode === 'portion') {
       const val = parseFloat(quantity);
       detailLabel = `${val} porc`;
+      calculatedPrice = parseFloat(selectedProduct.pricePorcion || selectedProduct.pricePortion || selectedProduct.price || 0);
     } else if (sellMode === 'amount') {
       const amountVal = parseFloat(quantity); 
       
       if (basePriceKg > 0) {
-        finalQtyGrams = Math.round((amountVal / basePriceKg) * 1000);
+        finalQty = Math.round((amountVal / basePriceKg) * 1000); // Cantidad en gramos
         finalMode = 'weight';
-        detailLabel = `$${amountVal} (${finalQtyGrams}g / ${(finalQtyGrams / 1000).toFixed(2)} kg)`;
+        detailLabel = `$${amountVal} (${finalQty}g / ${(finalQty / 1000).toFixed(2)} kg)`;
+        calculatedPrice = basePriceKg / 1000; // Precio real por gramo
       } else {
         detailLabel = `Monto libre ($${amountVal})`;
+        calculatedPrice = amountVal;
       }
     }
 
     const cartItem = {
       id: Date.now(),
+      product: selectedProduct._id || selectedProduct.id,
       productId: selectedProduct._id || selectedProduct.id,
       name: selectedProduct.name,
       category: selectedProduct.category || 'General',
       subcategory: selectedProduct.subcategory || '',
       mode: finalMode,
-      quantityVal: finalQtyGrams,
-      unitPrice: calculatedSubtotal / (finalQtyGrams || 1),
+      quantity: finalQty,
+      quantityVal: finalQty,
+      price: calculatedPrice, // FIX: Precio unitario o por gramo real
+      priceKg: basePriceKg,
       detailLabel,
       subtotal: calculatedSubtotal
     };
