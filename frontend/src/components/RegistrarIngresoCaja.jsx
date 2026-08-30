@@ -11,7 +11,6 @@ const RegistrarIngresoCaja = ({ onClose }) => {
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [notes, setNotes] = useState('');
   
-  // Lista dinámica de renglones/productos
   const [items, setItems] = useState([
     { productId: '', quantity: '', unitCost: '', subtotal: 0 }
   ]);
@@ -19,7 +18,6 @@ const RegistrarIngresoCaja = ({ onClose }) => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Cargar lista de proveedores al iniciar
   useEffect(() => {
     const fetchSuppliers = async () => {
       try {
@@ -35,19 +33,16 @@ const RegistrarIngresoCaja = ({ onClose }) => {
     fetchSuppliers();
   }, []);
 
-  // Agregar un nuevo renglón de producto
   const handleAddItem = () => {
     setItems([...items, { productId: '', quantity: '', unitCost: '', subtotal: 0 }]);
   };
 
-  // Eliminar un renglón
   const handleRemoveItem = (index) => {
     if (items.length === 1) return;
     const updated = items.filter((_, i) => i !== index);
     setItems(updated);
   };
 
-  // Manejar cambio de valores en cada renglón
   const handleItemChange = (index, field, value) => {
     const updated = [...items];
     updated[index][field] = value;
@@ -59,7 +54,6 @@ const RegistrarIngresoCaja = ({ onClose }) => {
     setItems(updated);
   };
 
-  // Calcular total pagado general
   const totalAmount = items.reduce((acc, curr) => acc + (curr.subtotal || 0), 0);
 
   const handleSubmit = async (e) => {
@@ -71,7 +65,6 @@ const RegistrarIngresoCaja = ({ onClose }) => {
 
     const supplierObj = suppliers.find(s => s._id === selectedSupplierId);
 
-    // Formatear array de ítems con datos completos del producto
     const formattedItems = [];
     for (const item of items) {
       const prod = products.find(p => p._id === item.productId);
@@ -116,7 +109,7 @@ const RegistrarIngresoCaja = ({ onClose }) => {
         throw new Error(errData.message || 'Error al guardar la entrada');
       }
 
-      await fetchProducts(); // Refrescar stock general
+      await fetchProducts();
       onClose();
     } catch (err) {
       setErrorMsg(err.message);
@@ -127,17 +120,71 @@ const RegistrarIngresoCaja = ({ onClose }) => {
 
   return (
     <div style={styles.overlay}>
-      <div style={styles.modal}>
+      <style>{`
+        .modal-responsive {
+          background-color: #fff;
+          padding: 16px;
+          border-radius: 12px;
+          width: 95%;
+          max-width: 600px;
+          max-height: 90vh;
+          overflow-y: auto;
+          box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+          box-sizing: border-box;
+        }
+
+        .header-row {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 10px;
+        }
+
+        .item-row {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 8px;
+          background: #ffffff;
+          padding: 10px;
+          border-radius: 6px;
+          border: 1px solid #cbd5e1;
+          margin-bottom: 8px;
+        }
+
+        .inputs-group {
+          display: grid;
+          grid-template-columns: 1fr 1fr auto;
+          gap: 8px;
+          align-items: center;
+        }
+
+        @media (min-width: 520px) {
+          .header-row {
+            grid-template-columns: 1fr 1fr;
+          }
+          .item-row {
+            grid-template-columns: 2fr 1fr 1fr auto auto;
+            align-items: center;
+            background: transparent;
+            padding: 4px 0;
+            border: none;
+            margin-bottom: 0;
+          }
+          .inputs-group {
+            display: contents;
+          }
+        }
+      `}</style>
+
+      <div className="modal-responsive">
         <div style={styles.header}>
-          <h3>📦 Ingreso Múltiple de Productos / Proveedor</h3>
+          <h3 style={{ margin: 0, fontSize: '1rem', color: '#0f172a' }}>📦 INGRESO MÚLTIPLE DE PRODUCTOS / PROVEEDOR</h3>
           <button onClick={onClose} style={styles.btnClose}>✕</button>
         </div>
 
         {errorMsg && <div style={styles.error}>{errorMsg}</div>}
 
         <form onSubmit={handleSubmit} style={styles.form}>
-          {/* Cabecera del Comprobante */}
-          <div style={styles.row}>
+          <div className="header-row">
             <label style={styles.label}>
               Proveedor:
               <select 
@@ -167,18 +214,17 @@ const RegistrarIngresoCaja = ({ onClose }) => {
             </label>
           </div>
 
-          {/* Lista de productos ingresados */}
           <div style={styles.itemsContainer}>
-            <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Productos a ingresar:</span>
+            <span style={{ fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '4px' }}>Productos a ingresar:</span>
             {items.map((item, index) => {
               const selectedProd = products.find(p => p._id === item.productId);
               return (
-                <div key={index} style={styles.itemRow}>
+                <div key={index} className="item-row">
                   <select
                     value={item.productId}
                     onChange={(e) => handleItemChange(index, 'productId', e.target.value)}
                     required
-                    style={{ ...styles.input, flex: 2 }}
+                    style={styles.input}
                   >
                     <option value="">-- Producto --</option>
                     {products.map(p => (
@@ -188,34 +234,36 @@ const RegistrarIngresoCaja = ({ onClose }) => {
                     ))}
                   </select>
 
-                  <input
-                    type="number"
-                    placeholder={selectedProd?.allowByWeight ? 'Gramos' : 'Cant'}
-                    value={item.quantity}
-                    onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                    required
-                    style={{ ...styles.input, flex: 1 }}
-                  />
+                  <div className="inputs-group">
+                    <input
+                      type="number"
+                      placeholder={selectedProd?.allowByWeight ? 'Gramos' : 'Cant'}
+                      value={item.quantity}
+                      onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                      required
+                      style={styles.input}
+                    />
 
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="Costo u."
-                    value={item.unitCost}
-                    onChange={(e) => handleItemChange(index, 'unitCost', e.target.value)}
-                    required
-                    style={{ ...styles.input, flex: 1 }}
-                  />
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="Costo u."
+                      value={item.unitCost}
+                      onChange={(e) => handleItemChange(index, 'unitCost', e.target.value)}
+                      required
+                      style={styles.input}
+                    />
 
-                  <div style={styles.subtotalText}>
-                    ${item.subtotal.toFixed(2)}
+                    <div style={styles.subtotalText}>
+                      ${item.subtotal.toFixed(2)}
+                    </div>
+
+                    {items.length > 1 && (
+                      <button type="button" onClick={() => handleRemoveItem(index)} style={styles.btnDelete}>
+                        🗑️
+                      </button>
+                    )}
                   </div>
-
-                  {items.length > 1 && (
-                    <button type="button" onClick={() => handleRemoveItem(index)} style={styles.btnDelete}>
-                      🗑️
-                    </button>
-                  )}
                 </div>
               );
             })}
@@ -236,7 +284,6 @@ const RegistrarIngresoCaja = ({ onClose }) => {
             />
           </label>
 
-          {/* Total del Pago */}
           <div style={styles.totalBox}>
             <span>TOTAL SALIDA DE CAJA:</span>
             <strong>${totalAmount.toFixed(2)}</strong>
@@ -255,23 +302,20 @@ const RegistrarIngresoCaja = ({ onClose }) => {
 };
 
 const styles = {
-  overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1500 },
-  modal: { backgroundColor: '#fff', padding: '20px', borderRadius: '12px', width: '100%', maxWidth: '650px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' },
-  btnClose: { background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer' },
+  overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1500, padding: '10px' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' },
+  btnClose: { background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b' },
   form: { display: 'flex', flexDirection: 'column', gap: '12px' },
-  row: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' },
-  itemsContainer: { display: 'flex', flexDirection: 'column', gap: '8px', background: '#f8fafc', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' },
-  itemRow: { display: 'flex', gap: '6px', alignItems: 'center' },
-  subtotalText: { minWidth: '70px', textAlign: 'right', fontWeight: 'bold', fontSize: '0.85rem' },
+  itemsContainer: { display: 'flex', flexDirection: 'column', gap: '6px', background: '#f8fafc', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' },
+  subtotalText: { minWidth: '60px', textAlign: 'right', fontWeight: 'bold', fontSize: '0.85rem', color: '#0f172a' },
   label: { fontSize: '0.85rem', fontWeight: 'bold', color: '#334155', display: 'flex', flexDirection: 'column', gap: '4px' },
-  input: { padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem' },
-  btnAddItem: { alignSelf: 'flex-start', padding: '6px 12px', fontSize: '0.8rem', background: '#e2e8f0', border: 'none', borderRadius: '4px', cursor: 'pointer', marginTop: '4px' },
-  btnDelete: { background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem' },
-  totalBox: { display: 'flex', justifyContent: 'space-between', padding: '12px', background: '#f1f5f9', borderRadius: '6px', fontSize: '1rem', color: '#0f172a' },
-  actions: { display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' },
-  btnCancel: { padding: '8px 16px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' },
-  btnSubmit: { padding: '8px 16px', borderRadius: '6px', border: 'none', background: '#16a34a', color: '#fff', fontWeight: 'bold', cursor: 'pointer' },
+  input: { padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', width: '100%', boxSizing: 'border-box' },
+  btnAddItem: { alignSelf: 'flex-start', padding: '8px 12px', fontSize: '0.8rem', background: '#e2e8f0', border: 'none', borderRadius: '6px', cursor: 'pointer', marginTop: '4px', fontWeight: 'bold' },
+  btnDelete: { background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', padding: '4px' },
+  totalBox: { display: 'flex', justifyContent: 'space-between', padding: '12px', background: '#f1f5f9', borderRadius: '6px', fontSize: '0.95rem', color: '#0f172a' },
+  actions: { display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px', flexWrap: 'wrap' },
+  btnCancel: { padding: '10px 16px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', flex: '1' },
+  btnSubmit: { padding: '10px 16px', borderRadius: '6px', border: 'none', background: '#16a34a', color: '#fff', fontWeight: 'bold', cursor: 'pointer', flex: '2' },
   error: { backgroundColor: '#fef2f2', color: '#991b1b', padding: '8px', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '10px' }
 };
 
