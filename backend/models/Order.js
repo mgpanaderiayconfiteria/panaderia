@@ -7,11 +7,12 @@ const orderSchema = new mongoose.Schema({
     price: { type: Number, required: true },
     quantity: { type: Number, required: true },
     mode: { type: String }, // 'weight', 'unit', 'portion', 'amount'
-    detailLabel: { type: String }
+    detailLabel: { type: String },
+    subtotal: { type: Number, required: true } // 👈 AGREGAR ESTE CAMPO
   }],
   subtotal: { type: Number, required: true },
-  discountAmount: { type: Number, default: 0 }, // Monto en $ descontado por promo
-  isCashDiscountApplied: { type: Boolean, default: false }, // Flag del botón del dueño
+  discountAmount: { type: Number, default: 0 },
+  isCashDiscountApplied: { type: Boolean, default: false },
   total: { type: Number, required: true },
   paidAmount: { type: Number },
   changeAmount: { type: Number, default: 0 },

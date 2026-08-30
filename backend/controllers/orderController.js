@@ -1,10 +1,7 @@
-const Order = require('../models/Order');
-const Product = require('../models/Product');
 const mongoose = require('mongoose');
+const Order = require('../models/Order');
 
-// @desc    Crear un nuevo pedido
-// @route   POST /api/orders
-// @access  Private / Public
+// 1. Crear una nueva orden / venta
 const createOrder = async (req, res) => {
   try {
     const { 
@@ -16,44 +13,63 @@ const createOrder = async (req, res) => {
       employee 
     } = req.body;
 
-    if (!items || items.length === 0) {
+    if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: 'No hay productos en la orden' });
     }
 
-    // 1. Mapear productos y calcular subtotal de forma segura en servidor
     let calculatedSubtotal = 0;
+
     const formattedItems = items.map((item) => {
       const prodId = item.productId || item.product || item._id || item.id;
-      const unitPrice = parseFloat(item.unitPrice || item.price || 0);
       const quantity = parseFloat(item.quantityVal || item.quantity || 1);
+      const unitPrice = parseFloat(item.unitPrice || item.price || 0);
+      const mode = item.mode || 'unit';
       
-      calculatedSubtotal += (unitPrice * quantity);
+      let itemSubtotal = parseFloat(item.subtotal || 0);
+
+      // Si no se envió subtotal individual o es 0, se calcula dinámicamente
+      if (!itemSubtotal || itemSubtotal <= 0) {
+        if (mode === 'weight' || mode === 'kg') {
+          // Si el precio viene como $/kg (ej: $2500) y la cantidad en gramos (ej: 250g)
+          if (unitPrice > 50 && quantity >= 10) {
+            itemSubtotal = (unitPrice / 1000) * quantity;
+          } else {
+            // Si el precio ya viene expresado por gramo (ej: $2.5/g * 250g)
+            itemSubtotal = unitPrice * quantity;
+          }
+        } else {
+          // Unidades o porciones
+          itemSubtotal = unitPrice * quantity;
+        }
+      }
+
+      calculatedSubtotal += itemSubtotal;
 
       return {
         product: mongoose.Types.ObjectId.isValid(prodId) ? prodId : null,
         name: item.name || 'Producto Sin Nombre',
         price: unitPrice,
         quantity: quantity,
-        mode: item.mode || 'unit',
-        detailLabel: item.detailLabel || ''
+        mode: mode,
+        detailLabel: item.detailLabel || '',
+        subtotal: itemSubtotal // 👈 Guarda el subtotal individual
       };
     });
 
-    // 2. Aplicar descuento del 10% solo si la promo está ACTIVA y el pago es EFECTIVO
     const method = paymentMethod || 'efectivo';
     let discountAmount = 0;
     let isCashDiscountApplied = false;
 
+    // Descuento del 10% solo si la compra es en efectivo
     if (isCashDiscountActive && method === 'efectivo') {
       discountAmount = calculatedSubtotal * 0.10;
       isCashDiscountApplied = true;
     }
 
-    const calculatedTotal = calculatedSubtotal - discountAmount;
+    const calculatedTotal = Math.max(0, calculatedSubtotal - discountAmount);
     const cleanPaidAmount = parseFloat(paidAmount || calculatedTotal);
     const calculatedChange = method === 'efectivo' ? Math.max(0, cleanPaidAmount - calculatedTotal) : 0;
 
-    // 3. Validar vendedor / empleado
     let validSeller = null;
     if (seller && mongoose.Types.ObjectId.isValid(seller)) {
       validSeller = seller;
@@ -61,7 +77,6 @@ const createOrder = async (req, res) => {
       validSeller = req.user._id;
     }
 
-    // 4. Crear la orden
     const order = new Order({
       items: formattedItems,
       subtotal: calculatedSubtotal,
@@ -77,34 +92,113 @@ const createOrder = async (req, res) => {
     });
 
     const createdOrder = await order.save();
-    console.log('✅ Orden guardada exitosamente en BD:', createdOrder._id);
-    res.status(201).json(createdOrder);
+    return res.status(201).json(createdOrder);
+
   } catch (error) {
-    console.error('❌ Error al crear orden en BD:', error);
-    res.status(500).json({ message: 'Error interno al procesar el pedido', error: error.message });
+    console.error('❌ Error al crear la orden:', error);
+    return res.status(500).json({ 
+      message: 'Error interno al procesar el pedido', 
+      error: error.message 
+    });
   }
 };
 
-// @desc    Obtener todas las órdenes
-// @route   GET /api/orders
-// @access  Private / Public
+// 2. Obtener todas las órdenes (con filtros opcionales por rango de fecha y estado)
 const getOrders = async (req, res) => {
   try {
-    const orders = await Order.find({}).sort({ createdAt: -1 });
-    res.json(orders);
+    const { startDate, endDate, status, limit = 100 } = req.query;
+    let query = {};
+
+    if (status) {
+      query.status = status;
+    }
+
+    if (startDate || endDate) {
+      query.createdAt = {};
+      if (startDate) query.createdAt.$gte = new Date(startDate);
+      if (endDate) query.createdAt.$lte = new Date(endDate);
+    }
+
+    const orders = await Order.find(query)
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .populate('seller', 'name email');
+
+    return res.status(200).json(orders);
   } catch (error) {
-    console.error('❌ Error al obtener órdenes:', error);
-    res.status(500).json({ message: 'Error interno al consultar pedidos', error: error.message });
+    console.error('❌ Error al consultar órdenes:', error);
+    return res.status(500).json({ message: 'Error al consultar las órdenes', error: error.message });
   }
 };
 
-// @desc    Eliminar una orden y restaurar stock
-// @route   DELETE /api/orders/:id
-// @access  Private / Admin
-const deleteOrder = async (req, res) => {
+// 3. Obtener detalle de una orden por ID
+const getOrderById = async (req, res) => {
   try {
     const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'ID de orden no válido' });
+    }
 
+    const order = await Order.findById(id).populate('seller', 'name email');
+    if (!order) {
+      return res.status(404).json({ message: 'Orden no encontrada' });
+    }
+
+    return res.status(200).json(order);
+  } catch (error) {
+    console.error('❌ Error al buscar la orden:', error);
+    return res.status(500).json({ message: 'Error interno del servidor', error: error.message });
+  }
+};
+
+// 4. Resumen de caja / ventas diarias
+const getDailySummary = async (req, res) => {
+  try {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const orders = await Order.find({
+      createdAt: { $gte: startOfDay, $lte: endOfDay },
+      status: 'completed'
+    });
+
+    let totalSales = 0;
+    let cashSales = 0;
+    let digitalSales = 0;
+    let totalDiscounts = 0;
+
+    orders.forEach(order => {
+      totalSales += order.total || 0;
+      totalDiscounts += order.discountAmount || 0;
+
+      if (order.paymentMethod === 'digital') {
+        digitalSales += order.total || 0;
+      } else {
+        cashSales += order.total || 0;
+      }
+    });
+
+    return res.status(200).json({
+      date: startOfDay.toISOString().split('T')[0],
+      totalOrders: orders.length,
+      totalSales,
+      cashSales,
+      digitalSales,
+      totalDiscounts
+    });
+  } catch (error) {
+    console.error('❌ Error al generar resumen diario:', error);
+    return res.status(500).json({ message: 'Error al calcular resumen diario', error: error.message });
+  }
+};
+
+// 5. Cancelar / Anular una orden
+const cancelOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: 'ID de orden no válido' });
     }
@@ -114,38 +208,25 @@ const deleteOrder = async (req, res) => {
       return res.status(404).json({ message: 'Orden no encontrada' });
     }
 
-    // Revertir stock
-    if (Array.isArray(order.items)) {
-      for (const item of order.items) {
-        if (item.product && mongoose.Types.ObjectId.isValid(item.product)) {
-          const product = await Product.findById(item.product);
-          if (product) {
-            const qty = parseFloat(item.quantity) || 0;
-            
-            if (product.allowByWeight) {
-              product.stockGrams = (product.stockGrams || 0) + qty;
-            } else {
-              product.stockUnits = (product.stockUnits || 0) + qty;
-            }
-            product.stock = (product.stock || 0) + qty;
-            
-            await product.save();
-          }
-        }
-      }
+    if (order.status === 'cancelled') {
+      return res.status(400).json({ message: 'La orden ya está cancelada' });
     }
 
-    await Order.findByIdAndDelete(id);
-    console.log('🗑️ Orden eliminada y stock devuelto:', id);
-    res.json({ message: 'Orden eliminada y stock devuelto con éxito', deletedId: id });
+    order.status = 'cancelled';
+    await order.save();
+
+    return res.status(200).json({ message: 'Orden cancelada con éxito', order });
   } catch (error) {
-    console.error('❌ Error al eliminar orden:', error);
-    res.status(500).json({ message: 'Error interno al eliminar el pedido', error: error.message });
+    console.error('❌ Error al cancelar la orden:', error);
+    return res.status(500).json({ message: 'Error al cancelar la orden', error: error.message });
   }
 };
 
+// Exportación de todas las funciones del controlador
 module.exports = {
   createOrder,
   getOrders,
-  deleteOrder
+  getOrderById,
+  getDailySummary,
+  cancelOrder
 };
