@@ -5,7 +5,7 @@ const PurchaseTransaction = require('../models/PurchaseTransaction');
 const Product = require('../models/Product');
 const Supplier = require('../models/Supplier');
 
-// GET /api/purchase-transactions - Obtener compras
+// GET /api/purchase-transactions
 router.get('/', async (req, res) => {
   try {
     const transactions = await PurchaseTransaction.find().sort({ createdAt: -1 });
@@ -16,31 +16,36 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /api/purchase-transactions - Registrar ingreso de mercadería
+// POST /api/purchase-transactions
 router.post('/', async (req, res) => {
   try {
     const { supplierId, supplierName, items, totalAmount, invoiceNumber, paymentMethod, notes } = req.body;
 
+    let validSupplierId = null;
     let finalSupplierName = supplierName || 'Proveedor General';
-    
-    // Validar si el supplierId enviado es un ID de MongoDB válido antes de consultar
+
+    // Verificar si el supplierId enviado es un ObjectId válido de Mongoose
     if (supplierId && mongoose.Types.ObjectId.isValid(supplierId)) {
+      validSupplierId = supplierId;
       const sup = await Supplier.findById(supplierId);
       if (sup) finalSupplierName = sup.name;
     }
 
-    // Asegurar estructura válida para los items
-    const formattedItems = Array.isArray(items) ? items.map(item => ({
-      product: item.product || item.productId || null,
-      name: item.name || 'Producto',
-      quantity: parseFloat(item.quantity) || 0,
-      unitCost: parseFloat(item.unitCost) || 0
-    })) : [];
+    // Normalización de productos recibidos
+    const formattedItems = Array.isArray(items) ? items.map(item => {
+      const prodId = item.product || item.productId;
+      return {
+        product: (prodId && mongoose.Types.ObjectId.isValid(prodId)) ? prodId : null,
+        name: item.name || item.productName || 'Producto',
+        quantity: parseFloat(item.quantity) || 0,
+        unitCost: parseFloat(item.unitCost || item.costPrice) || 0
+      };
+    }) : [];
 
     const isPaid = paymentMethod !== 'Pendiente';
 
     const newTransaction = new PurchaseTransaction({
-      supplierId: (supplierId && mongoose.Types.ObjectId.isValid(supplierId)) ? supplierId : null,
+      supplierId: validSupplierId,
       supplierName: finalSupplierName,
       items: formattedItems,
       totalAmount: parseFloat(totalAmount) || 0,
@@ -52,9 +57,9 @@ router.post('/', async (req, res) => {
 
     await newTransaction.save();
 
-    // Actualizar stock y costo en la colección de productos
+    // Actualización de stock en la colección de productos
     for (const item of formattedItems) {
-      if (item.product && mongoose.Types.ObjectId.isValid(item.product)) {
+      if (item.product) {
         const prod = await Product.findById(item.product);
         if (prod) {
           prod.stock = (parseFloat(prod.stock) || 0) + item.quantity;
@@ -68,12 +73,12 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(newTransaction);
   } catch (error) {
-    console.error('🔥 Error en POST /api/purchase-transactions:', error);
-    res.status(500).json({ message: 'Error interno al registrar la compra', error: error.message });
+    console.error('🔥 Error crítico en POST /api/purchase-transactions:', error);
+    res.status(500).json({ message: 'Error interno al guardar compra', error: error.message });
   }
 });
 
-// PATCH /api/purchase-transactions/:id/pay - Marcar como PAGADO
+// PATCH /api/purchase-transactions/:id/pay
 router.patch('/:id/pay', async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -89,9 +94,8 @@ router.patch('/:id/pay', async (req, res) => {
     transaction.paymentMethod = 'Efectivo';
     await transaction.save();
 
-    res.json({ message: 'Transacción saldada con éxito', transaction });
+    res.json({ message: 'Deuda registrada como pagada con éxito', transaction });
   } catch (error) {
-    console.error('Error al saldar deuda:', error);
     res.status(500).json({ message: 'Error al actualizar pago', error: error.message });
   }
 });
