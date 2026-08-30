@@ -1,6 +1,7 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StockCatalog from '../components/StockCatalog';
+import RegistrarIngresoCaja from '../components/RegistrarIngresoCaja'; // Componente de ingreso unificado
 import { SaleContext } from '../context/SaleContext';
 import { AuthContext } from '../context/AuthContext';
 import { ProductContext } from '../context/ProductContext';
@@ -11,13 +12,15 @@ const CajaHome = () => {
   const navigate = useNavigate();
   const { sales, clearSales, setSales } = useContext(SaleContext);
   const { user, logout } = useContext(AuthContext);
-  const { products, fetchProducts, addProduct } = useContext(ProductContext);
+  const { products, fetchProducts } = useContext(ProductContext);
 
   const [showCatalog, setShowCatalog] = useState(false);
   const [showCierreModal, setShowCierreModal] = useState(false);
   const [showAperturaModal, setShowAperturaModal] = useState(false);
   const [showWasteModal, setShowWasteModal] = useState(false);
-  const [showQuickProdModal, setShowQuickProdModal] = useState(false);
+  
+  // Estado para desplegar el modal de Ingreso de Proveedor
+  const [showIngresoProveedorModal, setShowIngresoProveedorModal] = useState(false);
 
   // Estado para bloquear múltiples clics accidentales
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -27,10 +30,6 @@ const CajaHome = () => {
   const [actualCashInput, setActualCashInput] = useState('');
   const [selectedWasteProd, setSelectedWasteProd] = useState('');
   const [wasteQty, setWasteQty] = useState('');
-  
-  const [newProd, setNewProd] = useState({ 
-    name: '', price: '', cost: '', stock: '', category: 'Panadería', sellType: 'unidad' 
-  });
 
   useEffect(() => {
     const savedCash = localStorage.getItem('mg_initial_cash');
@@ -96,49 +95,6 @@ const CajaHome = () => {
     }
   };
 
-  const handleQuickAddProduct = async () => {
-    if (!newProd.name || !newProd.price) {
-      alert('Nombre y precio de venta son obligatorios.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    const priceNum = parseFloat(newProd.price) || 0;
-    const stockNum = parseFloat(newProd.stock) || 0;
-    const costNum = parseFloat(newProd.cost) || 0;
-
-    const payload = {
-      name: newProd.name.trim(),
-      category: newProd.category,
-      cogs: costNum,
-      sellType: newProd.sellType,
-      allowByUnit: newProd.sellType === 'unidad',
-      allowByWeight: newProd.sellType === 'peso',
-      allowByPorcion: newProd.sellType === 'porcion',
-      priceUnit: newProd.sellType === 'unidad' ? priceNum : 0,
-      priceKg: newProd.sellType === 'peso' ? priceNum : 0,
-      pricePorcion: newProd.sellType === 'porcion' ? priceNum : 0,
-      price: priceNum,
-      stockUnits: newProd.sellType === 'unidad' ? stockNum : 0,
-      stockGrams: newProd.sellType === 'peso' ? stockNum : 0,
-      stockPorciones: newProd.sellType === 'porcion' ? stockNum : 0,
-      stock: stockNum
-    };
-
-    try {
-      const saved = await addProduct(payload);
-      if (saved) {
-        alert('📦 Producto dado de alta e incorporado al catálogo.');
-        setShowQuickProdModal(false);
-        setNewProd({ name: '', price: '', cost: '', stock: '', category: 'Panadería', sellType: 'unidad' });
-      }
-    } catch (e) {
-      alert('Error al guardar el producto.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   const handleFinalizarTurno = async () => {
     if (actualCashInput === '') {
       alert('Por favor ingrese el monto de efectivo real contado en la caja.');
@@ -196,7 +152,7 @@ const CajaHome = () => {
           min-height: 100dvh;
           padding: 12px;
           box-sizing: border-box;
-          background-color: #ffffff; /* Modificado: antes #fef2f2 */
+          background-color: #ffffff;
         }
 
         .top-info-bar {
@@ -251,18 +207,15 @@ const CajaHome = () => {
           justify-content: center;
           text-align: center;
           padding: 10px;
-          /* Transición fluida para la animación */
           transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.1s ease, opacity 0.2s ease;
           user-select: none;
         }
 
-        /* Animación de pulsación para los botones principales */
         .btn-circle:active {
           transform: scale(0.92);
           box-shadow: 0px 2px 4px rgba(185, 28, 28, 0.15);
         }
 
-        /* Animación para botones dentro de los modales */
         .btn-action-rojo {
           width: 100%;
           padding: 12px;
@@ -286,7 +239,6 @@ const CajaHome = () => {
           cursor: not-allowed;
         }
 
-        /* Degradado cromático en tonos de rojo inspirados en el diseño */
         .btn-main-red { background: linear-gradient(135deg, #ff0000 0%, #cc0000 100%); grid-column: span 2; max-width: 100%; aspect-ratio: auto; min-height: 100px; font-size: 1.4rem; }
         .btn-red-1 { background-color: #ef4444; }
         .btn-red-2 { background-color: #e11d48; }
@@ -348,7 +300,8 @@ const CajaHome = () => {
           📉 Cargar Sobrantes
         </button>
 
-        <button className="btn-circle btn-red-3" onClick={() => setShowQuickProdModal(true)}>
+        {/* BOTÓN ALTA PROVEEDORES CONECTADO AL MODAL COMPLETO DE INGRESO */}
+        <button className="btn-circle btn-red-3" onClick={() => setShowIngresoProveedorModal(true)}>
           🚚 Alta Proveedores
         </button>
 
@@ -442,89 +395,9 @@ const CajaHome = () => {
         </div>
       )}
 
-      {/* MODAL ALTA EXPRÉS PROVEEDORES */}
-      {showQuickProdModal && (
-        <div style={styles.modalOverlay}>
-          <div className="modal-card">
-            <div style={styles.modalHeader}>
-              <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#991b1b' }}>📦 RECEPCIÓN EXPRÉS PROVEEDOR</h3>
-              <button onClick={() => setShowQuickProdModal(false)} style={styles.btnCloseModal}>✕</button>
-            </div>
-
-            <input
-              type="text"
-              placeholder="Nombre del producto"
-              value={newProd.name}
-              onChange={(e) => setNewProd({ ...newProd, name: e.target.value })}
-              style={styles.inputForm}
-              disabled={isSubmitting}
-            />
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              <select
-                value={newProd.category}
-                onChange={(e) => setNewProd({ ...newProd, category: e.target.value })}
-                style={styles.inputForm}
-                disabled={isSubmitting}
-              >
-                <option value="Panadería">Panadería</option>
-                <option value="Facturería">Facturería</option>
-                <option value="Repostería">Repostería</option>
-                <option value="Cafetería">Cafetería</option>
-                <option value="Especialidades">Especialidades</option>
-              </select>
-
-              <select
-                value={newProd.sellType}
-                onChange={(e) => setNewProd({ ...newProd, sellType: e.target.value })}
-                style={styles.inputForm}
-                disabled={isSubmitting}
-              >
-                <option value="unidad">Por Unidad</option>
-                <option value="peso">Por Peso (Kg/Gr)</option>
-                <option value="porcion">Por Porción</option>
-              </select>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              <input
-                type="number"
-                step="0.01"
-                placeholder="Precio Venta ($)"
-                value={newProd.price}
-                onChange={(e) => setNewProd({ ...newProd, price: e.target.value })}
-                style={styles.inputForm}
-                disabled={isSubmitting}
-              />
-              <input
-                type="number"
-                step="0.01"
-                placeholder="Costo COGS ($)"
-                value={newProd.cost}
-                onChange={(e) => setNewProd({ ...newProd, cost: e.target.value })}
-                style={styles.inputForm}
-                disabled={isSubmitting}
-              />
-            </div>
-
-            <input
-              type="number"
-              placeholder={`Stock Inicial (${newProd.sellType === 'peso' ? 'Gramos' : 'Unidades'})`}
-              value={newProd.stock}
-              onChange={(e) => setNewProd({ ...newProd, stock: e.target.value })}
-              style={styles.inputForm}
-              disabled={isSubmitting}
-            />
-
-            <button 
-              onClick={handleQuickAddProduct} 
-              className="btn-action-rojo"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? 'GUARDANDO...' : 'INGRESAR PRODUCTO AL STOCK'}
-            </button>
-          </div>
-        </div>
+      {/* MODAL COMPLETO DE ALTA / RECEPCIÓN DE PROVEEDORES */}
+      {showIngresoProveedorModal && (
+        <RegistrarIngresoCaja onClose={() => setShowIngresoProveedorModal(false)} />
       )}
 
       {/* MODAL CIERRE DE TURNO */}
@@ -609,7 +482,7 @@ const CajaHome = () => {
 
 const styles = {
   btnLinkEdit: { background: 'none', border: 'none', color: '#ffffff', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.85rem', padding: 0, fontWeight: 'bold' },
-  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '12px' }, /* Modificado: antes rgba(127, 29, 29, 0.65) */
+  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '12px' },
   modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '6px', borderBottom: '1px solid #fca5a5' },
   btnCloseModal: { backgroundColor: '#fecaca', color: '#991b1b', border: 'none', padding: '6px 10px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.8rem' },
   modalBody: { padding: '10px', overflowY: 'auto', flex: 1 },
