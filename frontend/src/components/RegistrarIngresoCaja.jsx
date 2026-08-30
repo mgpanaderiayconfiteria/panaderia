@@ -43,13 +43,50 @@ const RegistrarIngresoCaja = ({ onClose }) => {
     setItems(updated);
   };
 
+  // Recalcular el subtotal considerando el tipo de venta (peso en gr o unidades)
+  const calculateSubtotal = (prod, qtyVal, costVal) => {
+    const qty = parseFloat(qtyVal) || 0;
+    const cost = parseFloat(costVal) || 0;
+
+    if (!prod) return 0;
+
+    // Si se vende por peso y el valor ingresado es en gramos (ej. 5000 gr = 5 kg)
+    if (prod.allowByWeight) {
+      return (qty / 1000) * cost;
+    }
+
+    return qty * cost;
+  };
+
+  const handleProductSelect = (index, productId) => {
+    const updated = [...items];
+    const selectedProd = products.find(p => p._id === productId);
+
+    updated[index].productId = productId;
+
+    if (selectedProd) {
+      // Obtener costo asignado en el modelo (soporta cost, costPrice o price)
+      const baseCost = selectedProd.cost || selectedProd.costPrice || selectedProd.price || 0;
+      updated[index].unitCost = baseCost.toString();
+      updated[index].subtotal = calculateSubtotal(selectedProd, updated[index].quantity, baseCost);
+    } else {
+      updated[index].unitCost = '';
+      updated[index].subtotal = 0;
+    }
+
+    setItems(updated);
+  };
+
   const handleItemChange = (index, field, value) => {
     const updated = [...items];
     updated[index][field] = value;
 
-    const qty = parseFloat(updated[index].quantity) || 0;
-    const cost = parseFloat(updated[index].unitCost) || 0;
-    updated[index].subtotal = qty * cost;
+    const selectedProd = products.find(p => p._id === updated[index].productId);
+    updated[index].subtotal = calculateSubtotal(
+      selectedProd,
+      updated[index].quantity,
+      updated[index].unitCost
+    );
 
     setItems(updated);
   };
@@ -73,13 +110,17 @@ const RegistrarIngresoCaja = ({ onClose }) => {
         return;
       }
 
+      // Convertir gramos a Kilos para el guardado en backend
+      const rawQty = parseFloat(item.quantity);
+      const finalQuantity = prod.allowByWeight ? rawQty / 1000 : rawQty;
+
       formattedItems.push({
         product: prod._id,
         productName: prod.name,
         category: prod.category,
         subcategory: prod.subcategory || '',
         sellType: prod.allowByWeight ? 'peso' : 'unidad',
-        quantity: parseFloat(item.quantity),
+        quantity: finalQuantity,
         unitCost: parseFloat(item.unitCost),
         subtotal: item.subtotal
       });
@@ -126,7 +167,7 @@ const RegistrarIngresoCaja = ({ onClose }) => {
           padding: 16px;
           border-radius: 12px;
           width: 95%;
-          max-width: 600px;
+          max-width: 650px;
           max-height: 90vh;
           overflow-y: auto;
           box-shadow: 0 10px 25px rgba(0,0,0,0.2);
@@ -152,25 +193,22 @@ const RegistrarIngresoCaja = ({ onClose }) => {
 
         .inputs-group {
           display: grid;
-          grid-template-columns: 1fr 1fr auto;
+          grid-template-columns: 1fr 1fr auto auto;
           gap: 8px;
           align-items: center;
         }
 
-        @media (min-width: 520px) {
+        @media (min-width: 550px) {
           .header-row {
             grid-template-columns: 1fr 1fr;
           }
           .item-row {
-            grid-template-columns: 2fr 1fr 1fr auto auto;
+            grid-template-columns: 2fr 2fr;
             align-items: center;
             background: transparent;
             padding: 4px 0;
             border: none;
             margin-bottom: 0;
-          }
-          .inputs-group {
-            display: contents;
           }
         }
       `}</style>
@@ -222,7 +260,7 @@ const RegistrarIngresoCaja = ({ onClose }) => {
                 <div key={index} className="item-row">
                   <select
                     value={item.productId}
-                    onChange={(e) => handleItemChange(index, 'productId', e.target.value)}
+                    onChange={(e) => handleProductSelect(index, e.target.value)}
                     required
                     style={styles.input}
                   >
@@ -237,7 +275,7 @@ const RegistrarIngresoCaja = ({ onClose }) => {
                   <div className="inputs-group">
                     <input
                       type="number"
-                      placeholder={selectedProd?.allowByWeight ? 'Gramos' : 'Cant'}
+                      placeholder={selectedProd?.allowByWeight ? 'Gramos (Ej: 5000)' : 'Cant'}
                       value={item.quantity}
                       onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
                       required
@@ -247,7 +285,7 @@ const RegistrarIngresoCaja = ({ onClose }) => {
                     <input
                       type="number"
                       step="0.01"
-                      placeholder="Costo u."
+                      placeholder={selectedProd?.allowByWeight ? 'Costo / Kg' : 'Costo u.'}
                       value={item.unitCost}
                       onChange={(e) => handleItemChange(index, 'unitCost', e.target.value)}
                       required
@@ -307,7 +345,7 @@ const styles = {
   btnClose: { background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b' },
   form: { display: 'flex', flexDirection: 'column', gap: '12px' },
   itemsContainer: { display: 'flex', flexDirection: 'column', gap: '6px', background: '#f8fafc', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' },
-  subtotalText: { minWidth: '60px', textAlign: 'right', fontWeight: 'bold', fontSize: '0.85rem', color: '#0f172a' },
+  subtotalText: { minWidth: '70px', textAlign: 'right', fontWeight: 'bold', fontSize: '0.85rem', color: '#0f172a' },
   label: { fontSize: '0.85rem', fontWeight: 'bold', color: '#334155', display: 'flex', flexDirection: 'column', gap: '4px' },
   input: { padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', width: '100%', boxSizing: 'border-box' },
   btnAddItem: { alignSelf: 'flex-start', padding: '8px 12px', fontSize: '0.8rem', background: '#e2e8f0', border: 'none', borderRadius: '6px', cursor: 'pointer', marginTop: '4px', fontWeight: 'bold' },
