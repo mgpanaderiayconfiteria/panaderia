@@ -230,9 +230,8 @@ const SuppliersManager = () => {
               onChange={(e) => setExpenseForm({ ...expenseForm, paymentMethod: e.target.value })}
               style={styles.input}
             >
-              <option value="transferencia">Transferencia Bancaria</option>
-              <option value="efectivo">Efectivo (Caja Central)</option>
-              <option value="cheque">Cheque</option>
+              <option value="transferencia">Transferencia</option>
+              <option value="efectivo">Efectivo </option>
             </select>
 
             <button type="submit" style={styles.btnPrimary}>Asentar Egreso</button>
