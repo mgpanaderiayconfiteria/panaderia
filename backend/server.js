@@ -10,7 +10,8 @@ const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const productRoutes = require('./routes/productRoutes');
 const orderRoutes = require('./routes/orderRoutes');
-const shiftRoutes = require('./routes/shiftRoutes'); // 👈 Importado
+const shiftRoutes = require('./routes/shiftRoutes');
+const supplierRoutes = require('./routes/supplierRoutes'); // 👈 Importado
 
 const app = express();
 
@@ -61,7 +62,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
-app.use('/api/shifts', shiftRoutes); // 👈 Montado para cierres y mermas
+app.use('/api/shifts', shiftRoutes);
+app.use('/api', supplierRoutes); // 👈 Montado para proveedores y egresos (/api/suppliers y /api/expenses)
 
 // Función para inicializar la cuenta Admin
 const initAdmin = async () => {

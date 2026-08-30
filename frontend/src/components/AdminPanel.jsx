@@ -3,6 +3,7 @@ import { ProductContext } from '../context/ProductContext';
 import { SaleContext } from '../context/SaleContext';
 import UsersManager from '../components/UsersManager';
 import ProductsManager from '../components/ProductsManager';
+import SuppliersManager from '../components/SuppliersManager';
 import AnalyticsModal from '../components/AnalyticsModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -264,6 +265,12 @@ const AdminPanel = () => {
             Panel de Control
           </span>
           <span
+            style={{ ...styles.navLink, ...(activeTab === 'suppliers' ? styles.navLinkActive : {}) }}
+            onClick={() => setActiveTab('suppliers')}
+          >
+            Proveedores y Gastos
+          </span>
+          <span
             style={{ ...styles.navLink, ...(activeTab === 'waste' ? styles.navLinkActive : {}) }}
             onClick={() => setActiveTab('waste')}
           >
@@ -292,6 +299,12 @@ const AdminPanel = () => {
           </div>
         </div>
       </nav>
+
+      {activeTab === 'suppliers' && (
+        <main style={styles.mainContent}>
+          <SuppliersManager />
+        </main>
+      )}
 
       {activeTab === 'products' && (
         <main style={styles.mainContent}>
