@@ -1,11 +1,12 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
+const qrcodeTerminal = require('qrcode-terminal');
+const QRCode = require('qrcode');
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 
 let client;
 let isReady = false;
-let lastQr = null; // Guardamos el último QR generado en memoria
+let qrCodeDataUrl = null; // Almacenará la imagen en base64 para la vista web
 
 const getExecutablePath = () => {
   try {
@@ -47,27 +48,26 @@ const initWhatsApp = () => {
     }
   });
 
-  client.on('qr', (qr) => {
-    lastQr = qr; // Almacenamos la cadena del QR para la vista web
-    
+  client.on('qr', async (qr) => {
+    try {
+      // Genera una imagen limpia HD en Base64 con alto contraste
+      qrCodeDataUrl = await QRCode.toDataURL(qr, { margin: 2, width: 400 });
+    } catch (err) {
+      console.error('Error al generar DataURL del QR:', err);
+    }
+
     console.log('\n==================================================');
-    console.log('📱 ESCANEA EL CÓDIGO QR PARA VINCULAR EL BOT DE WHATSAPP');
-    console.log('==================================================');
-    
-    // OPCIÓN 1: Genera un link directo a un generador de QR en imagen hd
-    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`;
-    console.log('👉 Abrí este enlace en tu navegador para ver el QR perfecto:');
-    console.log(qrImageUrl);
+    console.log('📱 CÓDIGO QR GENERADO');
+    console.log('👉 Entrá a: https://panaderia-2syo.onrender.com/qr para escanearlo');
     console.log('==================================================\n');
 
-    // Mantenemos la impresión en consola por si la quieres ver de todos modos
-    qrcode.generate(qr, { small: true });
+    qrcodeTerminal.generate(qr, { small: true });
   });
 
   client.on('ready', () => {
     console.log('✅ Bot de WhatsApp conectado y listo para enviar alertas!');
     isReady = true;
-    lastQr = null; // Limpiamos el QR una vez vinculado
+    qrCodeDataUrl = null;
   });
 
   client.on('disconnected', (reason) => {
@@ -101,13 +101,12 @@ const sendStockAlert = async (productName, currentStock, minStock, unitLabel) =>
   }
 };
 
-// Función auxiliar para obtener el QR actual en caso de querer exponerlo vía API
-const getQrStatus = () => {
-  return { isReady, qr: lastQr };
-};
+const getQrCodeDataUrl = () => qrCodeDataUrl;
+const getIsReady = () => isReady;
 
 module.exports = {
   initWhatsApp,
   sendStockAlert,
-  getQrStatus
+  getQrCodeDataUrl,
+  getIsReady
 };
