@@ -100,7 +100,7 @@ const createOrder = async (req, res) => {
           ptoVta: afipRes.ptoVta
         };
 
-        // Si se envió un correo, disparar la notificación de forma asíncrona
+        // Enviar mail con Resend
         if (clientEmail) {
           enviarFacturaEmail(clientEmail, {
             ...invoiceInfo,
@@ -109,9 +109,10 @@ const createOrder = async (req, res) => {
         }
       } catch (afipError) {
         console.error('⚠️ No se pudo autorizar la factura en ARCA:', afipError.message);
-        // Podés decidir si interrumpir la compra o guardar la orden con un estado de advertencia
       }
     }
+
+    const employeeName = employee || (req.user ? req.user.name : 'Empleado Caja');
 
     const order = new Order({
       items: formattedItems,
@@ -123,7 +124,7 @@ const createOrder = async (req, res) => {
       changeAmount: calculatedChange,
       paymentMethod: method,
       seller: validSeller,
-      employee: employee || (req.user ? req.user.name : 'Empleado Caja'),
+      employee: employeeName,
       invoice: invoiceInfo,
       status: 'completed'
     });
@@ -182,7 +183,19 @@ const createOrder = async (req, res) => {
       await product.save();
     }
 
-    return res.status(201).json(createdOrder);
+    // === ESTRUCTURA ENRIQUECIDA PARA EL DASHBOARD ===
+    const createdDate = new Date(createdOrder.createdAt || Date.now());
+    const orderObj = createdOrder.toObject();
+
+    const responseData = {
+      ...orderObj,
+      sellerName: employeeName,
+      cashier: employeeName,
+      dateStr: createdDate.toLocaleDateString('es-AR'),
+      timeStr: createdDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+    };
+
+    return res.status(201).json(responseData);
 
   } catch (error) {
     console.error('❌ Error al crear la orden:', error);
@@ -213,7 +226,20 @@ const getOrders = async (req, res) => {
       .limit(parseInt(limit))
       .populate('seller', 'name email');
 
-    return res.status(200).json(orders);
+    // Mapear ordenes para que el Dashboard siempre tenga dateStr, timeStr y cashier
+    const formattedOrders = orders.map(ord => {
+      const o = ord.toObject();
+      const dt = new Date(o.createdAt);
+      return {
+        ...o,
+        sellerName: o.employee || (o.seller ? o.seller.name : 'Empleado Caja'),
+        cashier: o.employee || (o.seller ? o.seller.name : 'Empleado Caja'),
+        dateStr: dt.toLocaleDateString('es-AR'),
+        timeStr: dt.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+      };
+    });
+
+    return res.status(200).json(formattedOrders);
   } catch (error) {
     console.error('❌ Error al consultar órdenes:', error);
     return res.status(500).json({ message: 'Error al consultar las órdenes', error: error.message });
