@@ -78,6 +78,86 @@ router.post('/', async (req, res) => {
   }
 });
 
+// PUT /api/purchase-transactions/:id (Edición de remito / compra cargada)
+router.put('/:id', async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: 'ID de transacción inválido' });
+    }
+
+    const transaction = await PurchaseTransaction.findById(req.params.id);
+    if (!transaction) {
+      return res.status(404).json({ message: 'Transacción no encontrada' });
+    }
+
+    const { supplierId, supplierName, items, totalAmount, invoiceNumber, paymentMethod, notes } = req.body;
+
+    // 1. Revertir el stock acumulado previamente por esta transacción
+    if (Array.isArray(transaction.items)) {
+      for (const oldItem of transaction.items) {
+        if (oldItem.product) {
+          const prod = await Product.findById(oldItem.product);
+          if (prod) {
+            prod.stock = Math.max(0, (parseFloat(prod.stock) || 0) - (parseFloat(oldItem.quantity) || 0));
+            await prod.save();
+          }
+        }
+      }
+    }
+
+    let validSupplierId = null;
+    let finalSupplierName = supplierName || 'Proveedor General';
+
+    if (supplierId && mongoose.Types.ObjectId.isValid(supplierId)) {
+      validSupplierId = supplierId;
+      const sup = await Supplier.findById(supplierId);
+      if (sup) finalSupplierName = sup.name;
+    }
+
+    const formattedItems = Array.isArray(items) ? items.map(item => {
+      const prodId = item.product || item.productId;
+      return {
+        product: (prodId && mongoose.Types.ObjectId.isValid(prodId)) ? prodId : null,
+        name: item.name || item.productName || 'Producto',
+        quantity: parseFloat(item.quantity) || 0,
+        unitCost: parseFloat(item.unitCost || item.costPrice) || 0
+      };
+    }) : [];
+
+    const isPaid = paymentMethod !== 'Pendiente';
+
+    transaction.supplierId = validSupplierId;
+    transaction.supplierName = finalSupplierName;
+    transaction.items = formattedItems;
+    transaction.totalAmount = parseFloat(totalAmount) || 0;
+    transaction.invoiceNumber = invoiceNumber || '';
+    transaction.paymentMethod = paymentMethod || 'Efectivo';
+    transaction.isPaid = isPaid;
+    transaction.notes = notes || '';
+
+    await transaction.save();
+
+    // 2. Aplicar el nuevo stock correspondiente a los ítems actualizados
+    for (const item of formattedItems) {
+      if (item.product) {
+        const prod = await Product.findById(item.product);
+        if (prod) {
+          prod.stock = (parseFloat(prod.stock) || 0) + item.quantity;
+          if (item.unitCost > 0) {
+            prod.costPrice = item.unitCost;
+          }
+          await prod.save();
+        }
+      }
+    }
+
+    res.json(transaction);
+  } catch (error) {
+    console.error('🔥 Error crítico en PUT /api/purchase-transactions/:id:', error);
+    res.status(500).json({ message: 'Error interno al actualizar compra', error: error.message });
+  }
+});
+
 // PATCH /api/purchase-transactions/:id/pay
 router.patch('/:id/pay', async (req, res) => {
   try {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import RegistrarIngresoCaja from './RegistrarIngresoCaja';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -7,6 +8,7 @@ const SuppliersManager = () => {
   const [suppliers, setSuppliers] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [purchases, setPurchases] = useState([]);
+  const [editingTransaction, setEditingTransaction] = useState(null);
 
   // Formulario Proveedor
   const [supplierForm, setSupplierForm] = useState({ name: '', cuit: '', phone: '', category: '' });
@@ -238,21 +240,38 @@ const SuppliersManager = () => {
                         ${parseFloat(p.totalAmount || 0).toFixed(2)}
                       </td>
                       <td style={styles.td}>
-                        <button
-                          onClick={() => handleMarkAsPaid(p._id || p.id)}
-                          style={{
-                            backgroundColor: '#16a34a',
-                            color: '#fff',
-                            border: 'none',
-                            padding: '4px 8px',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '0.75rem',
-                            fontWeight: 'bold'
-                          }}
-                        >
-                          ✓ Marcar Pagado
-                        </button>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button
+                            onClick={() => setEditingTransaction(p)}
+                            style={{
+                              backgroundColor: '#2563eb',
+                              color: '#fff',
+                              border: 'none',
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '0.75rem',
+                              fontWeight: 'bold'
+                            }}
+                          >
+                            ✏️ Editar
+                          </button>
+                          <button
+                            onClick={() => handleMarkAsPaid(p._id || p.id)}
+                            style={{
+                              backgroundColor: '#16a34a',
+                              color: '#fff',
+                              border: 'none',
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '0.75rem',
+                              fontWeight: 'bold'
+                            }}
+                          >
+                            ✓ Marcar Pagado
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -412,6 +431,16 @@ const SuppliersManager = () => {
             </tbody>
           </table>
         </div>
+      )}
+
+      {editingTransaction && (
+        <RegistrarIngresoCaja
+          transactionToEdit={editingTransaction}
+          onClose={() => {
+            setEditingTransaction(null);
+            fetchPurchases();
+          }}
+        />
       )}
     </div>
   );

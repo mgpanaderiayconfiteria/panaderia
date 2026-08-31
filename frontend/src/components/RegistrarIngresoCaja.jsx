@@ -3,7 +3,7 @@ import { ProductContext } from '../context/ProductContext';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-const RegistrarIngresoCaja = ({ onClose }) => {
+const RegistrarIngresoCaja = ({ onClose, transactionToEdit = null }) => {
   const { products, fetchProducts } = useContext(ProductContext);
 
   const [suppliers, setSuppliers] = useState([]);
@@ -35,6 +35,32 @@ const RegistrarIngresoCaja = ({ onClose }) => {
     fetchSuppliers();
   }, []);
 
+  useEffect(() => {
+    if (transactionToEdit) {
+      setSelectedSupplierId(transactionToEdit.supplierId || transactionToEdit.supplier || '');
+      setInvoiceNumber(transactionToEdit.invoiceNumber || '');
+      setPaymentMethod(transactionToEdit.paymentMethod || 'Efectivo');
+
+      if (Array.isArray(transactionToEdit.items) && transactionToEdit.items.length > 0) {
+        const initialItems = transactionToEdit.items.map((item) => {
+          const pId = item.product?._id || item.product || item.productId || '';
+          const prod = products.find(p => p._id === pId);
+          const qtyVal = item.quantity || 0;
+          const costVal = item.unitCost || 0;
+          const displayQty = (prod && prod.allowByWeight) ? (qtyVal * 1000).toString() : qtyVal.toString();
+
+          return {
+            productId: pId,
+            quantity: displayQty,
+            unitCost: costVal.toString(),
+            subtotal: calculateSubtotal(prod, displayQty, costVal)
+          };
+        });
+        setItems(initialItems);
+      }
+    }
+  }, [transactionToEdit, products]);
+
   const handleAddItem = () => {
     setItems([...items, { productId: '', quantity: '', unitCost: '', subtotal: 0 }]);
   };
@@ -49,7 +75,7 @@ const RegistrarIngresoCaja = ({ onClose }) => {
     const qty = parseFloat(qtyVal) || 0;
     const cost = parseFloat(costVal) || 0;
 
-    if (!prod) return 0;
+    if (!prod) return qty * cost;
 
     if (prod.allowByWeight) {
       return (qty / 1000) * cost;
@@ -139,8 +165,14 @@ const RegistrarIngresoCaja = ({ onClose }) => {
     };
 
     try {
-      const res = await fetch(`${API_URL}/api/purchase-transactions`, {
-        method: 'POST',
+      const isEdit = !!transactionToEdit;
+      const targetUrl = isEdit
+        ? `${API_URL}/api/purchase-transactions/${transactionToEdit._id || transactionToEdit.id}`
+        : `${API_URL}/api/purchase-transactions`;
+      const targetMethod = isEdit ? 'PUT' : 'POST';
+
+      const res = await fetch(targetUrl, {
+        method: targetMethod,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
@@ -251,7 +283,9 @@ const RegistrarIngresoCaja = ({ onClose }) => {
 
       <div className="modal-responsive">
         <div style={styles.header}>
-          <h3 style={{ margin: 0, fontSize: '1rem', color: '#0f172a' }}>📦 INGRESO MÚLTIPLE DE PRODUCTOS / PROVEEDOR</h3>
+          <h3 style={{ margin: 0, fontSize: '1rem', color: '#0f172a' }}>
+            {transactionToEdit ? '✏️ EDITAR INGRESO / COMPRA' : '📦 INGRESO MÚLTIPLE DE PRODUCTOS / PROVEEDOR'}
+          </h3>
           <button onClick={onClose} style={styles.btnClose}>✕</button>
         </div>
 
@@ -397,7 +431,7 @@ const RegistrarIngresoCaja = ({ onClose }) => {
           <div style={styles.actions}>
             <button type="button" onClick={onClose} style={styles.btnCancel}>Cancelar</button>
             <button type="submit" disabled={loading} style={styles.btnSubmit}>
-              {loading ? 'Procesando...' : 'Confirmar e Incrementar Stocks'}
+              {loading ? 'Procesando...' : (transactionToEdit ? 'Guardar Cambios' : 'Confirmar e Incrementar Stocks')}
             </button>
           </div>
         </form>
