@@ -1,145 +1,34 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcodeTerminal = require('qrcode-terminal');
-const QRCode = require('qrcode');
-const puppeteer = require('puppeteer');
-const fs = require('fs');
-const path = require('path');
+const sendStockAlert = async (productName, currentStock, minStock, unitLabel) => {
+  const phone = process.env.ALERT_PHONE_NUMBER;
+  const apiKey = process.env.CALLMEBOT_API_KEY;
 
-let client;
-let isReady = false;
-let qrCodeDataUrl = null;
+  if (!phone || !apiKey) {
+    console.warn('⚠️ Falta configurar ALERT_PHONE_NUMBER o CALLMEBOT_API_KEY en las variables de entorno.');
+    return;
+  }
 
-const getExecutablePath = () => {
+  const text = `⚠️ *ALERTA DE STOCK BAJO* ⚠️\n\nEl producto *${productName}* alcanzó el límite mínimo de stock.\n\n📉 *Stock Actual:* ${currentStock} ${unitLabel}\n⚙️ *Stock Mínimo:* ${minStock} ${unitLabel}\n\nPor favor, reponer stock a la brevedad.`;
+
+  const url = `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(phone)}&text=${encodeURIComponent(text)}&apikey=${encodeURIComponent(apiKey)}`;
+
   try {
-    const pPath = puppeteer.executablePath();
-    if (pPath && fs.existsSync(pPath)) return pPath;
-  } catch (e) {
-    // Si falla continua
+    const response = await fetch(url);
+    if (response.ok) {
+      console.log(`📲 Alerta enviada correctamente por WhatsApp a ${phone} para: ${productName}`);
+    } else {
+      console.error('❌ Error al enviar mensaje por CallMeBot:', response.statusText);
+    }
+  } catch (error) {
+    console.error('❌ Error de conexión al enviar alerta de WhatsApp:', error.message);
   }
-
-  const linuxPaths = [
-    '/usr/bin/chromium-browser',
-    '/usr/bin/chromium',
-    '/usr/bin/google-chrome-stable'
-  ];
-
-  for (const p of linuxPaths) {
-    if (fs.existsSync(p)) return p;
-  }
-
-  return undefined;
 };
 
 const initWhatsApp = () => {
-  const authPath = process.env.NODE_ENV === 'production' 
-    ? path.join('/tmp', 'whatsapp_auth') 
-    : path.join(__dirname, '../whatsapp_auth');
-
-  client = new Client({
-    authStrategy: new LocalAuth({ dataPath: authPath }),
-    puppeteer: {
-      headless: 'shell',
-      executablePath: getExecutablePath(),
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--disable-gpu',
-        '--disable-software-rasterizer',
-        '--disable-extensions',
-        '--disable-component-update',
-        '--disable-background-networking',
-        '--disable-background-timer-throttling',
-        '--disable-backgrounding-occluded-windows',
-        '--disable-breakpad',
-        '--disable-client-side-phishing-detection',
-        '--disable-default-apps',
-        '--disable-hang-monitor',
-        '--disable-popup-blocking',
-        '--disable-prompt-on-repost',
-        '--disable-sync',
-        '--disable-translate',
-        '--metrics-recording-only',
-        '--no-default-browser-check',
-        '--safebrowsing-disable-auto-update',
-        '--disable-speech-api',
-        '--js-flags=--max-old-space-size=180'
-      ]
-    }
-  });
-
-  client.on('qr', async (qr) => {
-    try {
-      qrCodeDataUrl = await QRCode.toDataURL(qr, { margin: 2, width: 320 });
-    } catch (err) {
-      console.error('Error al generar DataURL del QR:', err);
-    }
-
-    console.log('\n==================================================');
-    console.log('📱 CÓDIGO QR GENERADO');
-    console.log('👉 Entrá a: https://panaderia-2syo.onrender.com/qr para escanearlo');
-    console.log('==================================================\n');
-
-    qrcodeTerminal.generate(qr, { small: true });
-  });
-
-  client.on('loading_screen', (percent, message) => {
-    console.log(`⏳ Cargando WhatsApp Web: ${percent}% - ${message}`);
-  });
-
-  client.on('authenticated', () => {
-    console.log('🔐 Sesión de WhatsApp autenticada correctamente.');
-  });
-
-  client.on('ready', () => {
-    console.log('✅ Bot de WhatsApp conectado y listo para enviar alertas!');
-    isReady = true;
-    qrCodeDataUrl = null;
-  });
-
-  client.on('auth_failure', (msg) => {
-    console.error('❌ Error de autenticación en WhatsApp:', msg);
-    isReady = false;
-  });
-
-  client.on('disconnected', (reason) => {
-    console.warn('⚠️ Bot de WhatsApp desconectado:', reason);
-    isReady = false;
-  });
-
-  client.initialize().catch(err => {
-    console.error('🔥 Error al inicializar Puppeteer/WhatsApp:', err.message);
-  });
+  console.log('✅ Servicio de alertas de WhatsApp activo vía CallMeBot API.');
 };
 
-const sendStockAlert = async (productName, currentStock, minStock, unitLabel) => {
-  if (!isReady) {
-    console.warn('⚠️ No se envió la alerta de WhatsApp: El bot no está conectado.');
-    return;
-  }
-
-  const phone = process.env.ALERT_PHONE_NUMBER;
-  if (!phone) {
-    console.warn('⚠️ Falta configurar ALERT_PHONE_NUMBER en las variables de entorno.');
-    return;
-  }
-
-  const formattedPhone = phone.includes('@c.us') ? phone : `${phone}@c.us`;
-  const message = `⚠️ *ALERTA DE STOCK BAJO* ⚠️\n\nEl producto *${productName}* alcanzó el límite mínimo de stock.\n\n📉 *Stock Actual:* ${currentStock} ${unitLabel}\n⚙️ *Stock Mínimo:* ${minStock} ${unitLabel}\n\nPor favor, reponer stock a la brevedad.`;
-
-  try {
-    await client.sendMessage(formattedPhone, message);
-    console.log(`📲 Alerta enviada a WhatsApp (${phone}) para el producto: ${productName}`);
-  } catch (error) {
-    console.error('❌ Error al enviar mensaje por WhatsApp:', error.message);
-  }
-};
-
-const getQrCodeDataUrl = () => qrCodeDataUrl;
-const getIsReady = () => isReady;
+const getQrCodeDataUrl = () => null;
+const getIsReady = () => true;
 
 module.exports = {
   initWhatsApp,
