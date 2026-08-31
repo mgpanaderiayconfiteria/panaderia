@@ -4,8 +4,8 @@ const mongoose = require('mongoose');
 require('dotenv').config();
 
 const User = require('./models/User');
-// Importamos las funciones necesarias del servicio de WhatsApp
-const { initWhatsApp, getQrCodeDataUrl, getIsReady, sendStockAlert } = require('./services/whatsappService');
+// Importamos las funciones del servicio de WhatsApp
+const { initWhatsApp, getIsReady, sendStockAlert } = require('./services/whatsappService');
 
 // Importaciones de rutas
 const authRoutes = require('./routes/authRoutes');
@@ -59,61 +59,33 @@ app.use((req, res, next) => {
   next();
 });
 
-// Endpoint dedicado para visualizar y escanear el QR desde el navegador
+// Endpoint dedicado para verificar el estado del bot de WhatsApp
 app.get('/qr', (req, res) => {
-  if (getIsReady()) {
-    return res.send(`
-      <div style="font-family: system-ui, sans-serif; text-align: center; margin-top: 50px;">
-        <h2 style="color: #166534;">✅ El Bot de WhatsApp ya se encuentra conectado y activo.</h2>
-      </div>
-    `);
-  }
-
-  const qrUrl = getQrCodeDataUrl();
-
-  if (!qrUrl) {
-    return res.send(`
-      <div style="font-family: system-ui, sans-serif; text-align: center; margin-top: 50px;">
-        <h2>⏳ Generando código QR... Recargá la página en unos segundos.</h2>
-        <script>setTimeout(() => location.reload(), 3000);</script>
-      </div>
-    `);
-  }
-
   res.send(`
     <!DOCTYPE html>
     <html lang="es">
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Vincular WhatsApp - MG Panadería</title>
+      <title>Estado WhatsApp - MG Panadería</title>
       <style>
-        body { font-family: system-ui, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #f8fafc; }
+        body { font-family: system-ui, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #f8fafc; }
         .card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); text-align: center; max-width: 400px; }
-        img { width: 300px; height: 300px; border: 1px solid #e2e8f0; border-radius: 8px; margin: 15px 0; }
-        p { color: #64748b; font-size: 0.9rem; }
+        .status { font-weight: bold; color: #166534; font-size: 1.2rem; margin-top: 15px; }
       </style>
-      <script>
-        setInterval(() => {
-          fetch('/qr-status').then(r => r.json()).then(data => {
-            if(data.isReady) location.reload();
-          });
-        }, 4000);
-      </script>
     </head>
     <body>
       <div class="card">
-        <h2 style="margin: 0; color: #0f172a;">Vincular Bot de WhatsApp</h2>
-        <p>Abrí WhatsApp en tu teléfono > Dispositivos vinculados > Vincular un dispositivo y escaneá esta imagen:</p>
-        <img src="${qrUrl}" alt="Código QR de WhatsApp" />
-        <p style="font-size: 0.75rem;">Esta página se actualizará automáticamente una vez vinculado.</p>
+        <h2 style="margin: 0; color: #0f172a;">Servicio de Alertas WhatsApp</h2>
+        <div class="status">✅ Conectado y Activo vía CallMeBot API</div>
+        <p style="color: #64748b; font-size: 0.9rem; margin-top: 15px;">Las alertas de stock bajo se enviarán automáticamente sin requerir escaneo de QR.</p>
       </div>
     </body>
     </html>
   `);
 });
 
-// Endpoint auxiliar para verificar el estado de conexión sin recargar manualmente
+// Endpoint auxiliar para verificar el estado de la conexión
 app.get('/qr-status', (req, res) => {
   res.json({ isReady: getIsReady() });
 });
@@ -126,13 +98,6 @@ app.get('/api/test-whatsapp', async (req, res) => {
     return res.status(400).json({
       success: false,
       error: 'La variable ALERT_PHONE_NUMBER no está configurada en el entorno (.env / Render).'
-    });
-  }
-
-  if (!getIsReady()) {
-    return res.status(503).json({
-      success: false,
-      error: 'El cliente de WhatsApp no está listo. Escaneá el QR en /qr primero.'
     });
   }
 
