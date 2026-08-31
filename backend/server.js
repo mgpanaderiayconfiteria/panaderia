@@ -120,11 +120,40 @@ app.get('/qr-status', (req, res) => {
 
 // Endpoint para probar el envío directo de alertas por WhatsApp
 app.get('/api/test-whatsapp', async (req, res) => {
+  const targetPhone = process.env.ALERT_PHONE_NUMBER;
+
+  if (!targetPhone) {
+    return res.status(400).json({
+      success: false,
+      error: 'La variable ALERT_PHONE_NUMBER no está configurada en el entorno (.env / Render).'
+    });
+  }
+
+  if (!getIsReady()) {
+    return res.status(503).json({
+      success: false,
+      error: 'El cliente de WhatsApp no está listo. Escaneá el QR en /qr primero.'
+    });
+  }
+
   try {
-    await sendStockAlert('Harina 000 (PRUEBA)', 2, 5, 'Kg');
-    res.json({ message: 'Alerta de prueba enviada a WhatsApp' });
+    const sendPromise = sendStockAlert('Harina 000 (PRUEBA)', 2, 5, 'Kg');
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Tiempo de espera agotado al enviar por WhatsApp')), 10000)
+    );
+
+    await Promise.race([sendPromise, timeoutPromise]);
+
+    res.json({
+      success: true,
+      message: `Alerta de prueba enviada con éxito al número ${targetPhone}`
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('❌ Error en test-whatsapp:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
   }
 });
 
