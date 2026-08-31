@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, LineChart, Line, CartesianGrid
@@ -12,40 +12,60 @@ const MONTH_NAMES = [
 ];
 
 const AnalyticsModal = ({ isOpen, onClose, sales = [], products = [] }) => {
-  const [activeTab, setActiveTab] = useState('rendimiento');
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [activeTab, setActiveTab] = useState('mensual');
+  const [selectedYear, setSelectedYear] = useState('TODOS');
 
   if (!isOpen) return null;
 
-  // 1. Procesar Ventas por Producto
+  // 1. Filtrar solo órdenes completadas
+  const completedOrders = sales.filter(order => order.status !== 'cancelled');
+
+  // Función para obtener fechas válidas usando timestamps de Mongoose (createdAt)
+  const parseOrderDate = (order) => {
+    const rawDate = order.createdAt || order.updatedAt || order.date;
+    if (!rawDate) return null;
+    const parsed = new Date(rawDate);
+    return isNaN(parsed.getTime()) ? null : parsed;
+  };
+
+  // Extraer lista de años presentes en las órdenes de la BD
+  const availableYears = Array.from(
+    new Set(
+      completedOrders
+        .map(o => parseOrderDate(o))
+        .filter(d => d !== null)
+        .map(d => d.getFullYear())
+    )
+  ).sort((a, b) => b - a);
+
+  // 2. Procesar productos vendidos desde order.items
   const productSalesMap = {};
-  sales.forEach(sale => {
-    if (sale.items && Array.isArray(sale.items)) {
-      sale.items.forEach(item => {
-        const name = item.name || item.productName || 'Producto';
-        const qty = parseFloat(item.quantity) || 1;
-        const total = parseFloat(item.price * qty) || 0;
+  completedOrders.forEach(order => {
+    if (order.items && Array.isArray(order.items)) {
+      order.items.forEach(item => {
+        const name = item.name || 'Producto';
+        const qty = parseFloat(item.quantity) || 0;
+        // Usa item.subtotal asignado en el esquema o calcula precio por cantidad
+        const itemSubtotal = parseFloat(item.subtotal) || (parseFloat(item.price || 0) * qty);
 
         if (!productSalesMap[name]) {
           productSalesMap[name] = { name, cantidad: 0, total: 0 };
         }
         productSalesMap[name].cantidad += qty;
-        productSalesMap[name].total += total;
+        productSalesMap[name].total += itemSubtotal;
       });
     }
   });
 
   const productPerformance = Object.values(productSalesMap).sort((a, b) => b.total - a.total);
-
-  // Top 5 Más Vendidos y 5 Menos Vendidos
   const topProducts = productPerformance.slice(0, 5);
   const lowProducts = productPerformance.slice(-5).reverse();
 
-  // 2. Ventas por Método de Pago
+  // 3. Ventas por Método de Pago (efectivo vs digital)
   const paymentMap = { efectivo: 0, digital: 0 };
-  sales.forEach(s => {
-    const method = s.paymentMethod === 'digital' ? 'digital' : 'efectivo';
-    paymentMap[method] += parseFloat(s.total) || 0;
+  completedOrders.forEach(o => {
+    const method = o.paymentMethod === 'digital' ? 'digital' : 'efectivo';
+    paymentMap[method] += parseFloat(o.total || 0);
   });
 
   const paymentData = [
@@ -53,17 +73,33 @@ const AnalyticsModal = ({ isOpen, onClose, sales = [], products = [] }) => {
     { name: 'Mercado Pago / Digital', value: paymentMap.digital }
   ];
 
-  // 3. Procesar Agrupación de Ventas Mensuales
+  // 4. Mapeo Mensual de Órdenes
   const getMonthlyData = () => {
-    // Inicializar los 12 meses en cero
-    const monthlyMap = MONTH_NAMES.map(month => ({ mes: month, total: 0, ordenes: 0 }));
+    const monthlyMap = MONTH_NAMES.map(month => ({
+      mes: month,
+      total: 0,
+      subtotal: 0,
+      descuentos: 0,
+      ordenes: 0
+    }));
 
-    sales.forEach(s => {
-      const saleDate = new Date(s.createdAt || s.date || Date.now());
-      if (saleDate.getFullYear() === Number(selectedYear)) {
-        const monthIndex = saleDate.getMonth();
-        monthlyMap[monthIndex].total += parseFloat(s.total || s.totalAmount) || 0;
-        monthlyMap[monthIndex].ordenes += 1;
+    completedOrders.forEach(order => {
+      const orderDate = parseOrderDate(order);
+      const totalAmount = parseFloat(order.total) || 0;
+      const subtotalAmount = parseFloat(order.subtotal) || totalAmount;
+      const discount = parseFloat(order.discountAmount) || 0;
+
+      if (orderDate) {
+        if (selectedYear === 'TODOS' || orderDate.getFullYear().toString() === selectedYear.toString()) {
+          const monthIndex = orderDate.getMonth();
+          monthlyMap[monthIndex].total += totalAmount;
+          monthlyMap[monthIndex].subtotal += subtotalAmount;
+          monthlyMap[monthIndex].descuentos += discount;
+          monthlyMap[monthIndex].ordenes += 1;
+        }
+      } else if (selectedYear === 'TODOS') {
+        monthlyMap[0].total += totalAmount;
+        monthlyMap[0].ordenes += 1;
       }
     });
 
@@ -71,16 +107,9 @@ const AnalyticsModal = ({ isOpen, onClose, sales = [], products = [] }) => {
   };
 
   const monthlyData = getMonthlyData();
-  const totalYearAmount = monthlyData.reduce((acc, curr) => acc + curr.total, 0);
-
-  // Extraer lista de años disponibles en las ventas
-  const availableYears = Array.from(
-    new Set(sales.map(s => new Date(s.createdAt || s.date || Date.now()).getFullYear()))
-  ).sort((a, b) => b - a);
-
-  if (!availableYears.includes(new Date().getFullYear())) {
-    availableYears.unshift(new Date().getFullYear());
-  }
+  const totalNetSales = monthlyData.reduce((acc, curr) => acc + curr.total, 0);
+  const totalDiscounts = monthlyData.reduce((acc, curr) => acc + curr.descuentos, 0);
+  const totalOrdersCount = monthlyData.reduce((acc, curr) => acc + curr.ordenes, 0);
 
   return (
     <div style={styles.overlay}>
@@ -91,19 +120,19 @@ const AnalyticsModal = ({ isOpen, onClose, sales = [], products = [] }) => {
           <button onClick={onClose} style={styles.btnClose}>✕</button>
         </div>
 
-        {/* Solapas de Navegación */}
+        {/* Navegación */}
         <div style={styles.tabs}>
-          <button
-            style={activeTab === 'rendimiento' ? styles.tabActive : styles.tab}
-            onClick={() => setActiveTab('rendimiento')}
-          >
-            🏆 Mas Vendidos
-          </button>
           <button
             style={activeTab === 'mensual' ? styles.tabActive : styles.tab}
             onClick={() => setActiveTab('mensual')}
           >
             📅 Evolución Mensual
+          </button>
+          <button
+            style={activeTab === 'rendimiento' ? styles.tabActive : styles.tab}
+            onClick={() => setActiveTab('rendimiento')}
+          >
+            🏆 Mas Vendidos
           </button>
           <button
             style={activeTab === 'marketing' ? styles.tabActive : styles.tab}
@@ -119,13 +148,58 @@ const AnalyticsModal = ({ isOpen, onClose, sales = [], products = [] }) => {
           </button>
         </div>
 
-        {/* Cuerpo con Gráficos */}
+        {/* Cuerpo del Modal */}
         <div style={styles.body}>
+          {activeTab === 'mensual' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <div>
+                  <h3>Facturación Mensual {selectedYear !== 'TODOS' ? `(${selectedYear})` : '(Histórico Total)'}</h3>
+                  <p style={styles.sub}>
+                    Total Neto: <strong>${totalNetSales.toFixed(2)}</strong> | Órdenes Completadas: <strong>{totalOrdersCount}</strong> | Descuentos: <strong>${totalDiscounts.toFixed(2)}</strong>
+                  </p>
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', marginRight: '8px' }}>Filtrar Año:</label>
+                  <select
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(e.target.value)}
+                    style={styles.select}
+                  >
+                    <option value="TODOS">Todos los Años</option>
+                    {availableYears.map(year => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ width: '100%', height: 320 }}>
+                <ResponsiveContainer>
+                  <LineChart data={monthlyData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="mes" />
+                    <YAxis />
+                    <Tooltip 
+                      formatter={(value, name) => [
+                        `$${Number(value).toFixed(2)}`, 
+                        name === 'total' ? 'Facturación Neta' : 'Descuentos'
+                      ]} 
+                    />
+                    <Legend />
+                    <Line type="monotone" dataKey="total" name="Facturación Neta ($)" stroke="#16a34a" strokeWidth={3} dot={{ r: 5 }} />
+                    <Line type="monotone" dataKey="descuentos" name="Descuentos ($)" stroke="#dc2626" strokeWidth={2} strokeDasharray="5 5" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'rendimiento' && (
             <div>
               <h3>Rendimiento de Ventas por Producto ($)</h3>
-              <p style={styles.sub}>Productos que mayor facturación generaron.</p>
-              <div style={{ width: '100%', height: 300 }}>
+              <p style={styles.sub}>Productos ordenados por ingresos generados.</p>
+              <div style={{ width: '100%', height: 320 }}>
                 <ResponsiveContainer>
                   <BarChart data={topProducts}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -134,42 +208,6 @@ const AnalyticsModal = ({ isOpen, onClose, sales = [], products = [] }) => {
                     <Tooltip formatter={(value) => `$${value.toFixed(2)}`} />
                     <Bar dataKey="total" fill="#2563eb" radius={[6, 6, 0, 0]} />
                   </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'mensual' && (
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <div>
-                  <h3>Facturación Mensual ({selectedYear})</h3>
-                  <p style={styles.sub}>Total acumulado del año: <strong>${totalYearAmount.toFixed(2)}</strong></p>
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', marginRight: '8px' }}>Año:</label>
-                  <select
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(e.target.value)}
-                    style={styles.select}
-                  >
-                    {availableYears.map(year => (
-                      <option key={year} value={year}>{year}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ width: '100%', height: 300 }}>
-                <ResponsiveContainer>
-                  <LineChart data={monthlyData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="mes" />
-                    <YAxis />
-                    <Tooltip formatter={(value) => `$${Number(value).toFixed(2)}`} />
-                    <Legend />
-                    <Line type="monotone" dataKey="total" name="Facturación ($)" stroke="#16a34a" strokeWidth={3} dot={{ r: 5 }} />
-                  </LineChart>
                 </ResponsiveContainer>
               </div>
             </div>
@@ -205,7 +243,7 @@ const AnalyticsModal = ({ isOpen, onClose, sales = [], products = [] }) => {
           {activeTab === 'pagos' && (
             <div>
               <h3>Distribución de Ingresos por Medio de Pago</h3>
-              <div style={{ width: '100%', height: 300 }}>
+              <div style={{ width: '100%', height: 320 }}>
                 <ResponsiveContainer>
                   <PieChart>
                     <Pie data={paymentData} cx="50%" cy="50%" outerRadius={100} label dataKey="value">
@@ -235,7 +273,7 @@ const styles = {
   tab: { flex: 1, padding: '12px', border: 'none', background: 'none', cursor: 'pointer', fontWeight: 'bold', color: '#64748b', fontSize: '0.85rem' },
   tabActive: { flex: 1, padding: '12px', border: 'none', background: '#ffffff', borderBottom: '3px solid #2563eb', cursor: 'pointer', fontWeight: 'bold', color: '#2563eb', fontSize: '0.85rem' },
   body: { padding: '24px', overflowY: 'auto' },
-  sub: { fontSize: '0.85rem', color: '#64748b', marginTop: '-4px', marginBottom: '16px' },
+  sub: { fontSize: '0.85rem', color: '#64748b', marginTop: '-4px', marginBottom: '8px' },
   select: { padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 'bold', cursor: 'pointer' },
   marketingGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' },
   cardInfoGood: { backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', padding: '16px', borderRadius: '12px' },
