@@ -166,7 +166,7 @@ const CajaHome = () => {
           border-radius: 20px;
           font-size: 0.95rem;
           color: #ffffff;
-          box-shadow: 0 4px 6px rgba(220, 38, 38, 0.2);
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
           margin-bottom: 20px;
           width: 100%;
           max-width: 800px;
@@ -200,7 +200,7 @@ const CajaHome = () => {
           font-weight: bold;
           font-size: clamp(0.8rem, 3vw, 1rem);
           cursor: pointer;
-          box-shadow: 0px 4px 12px rgba(185, 28, 28, 0.25);
+          box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.15);
           display: flex;
           flex-direction: column;
           align-items: center;
@@ -213,7 +213,7 @@ const CajaHome = () => {
 
         .btn-circle:active {
           transform: scale(0.92);
-          box-shadow: 0px 2px 4px rgba(185, 28, 28, 0.15);
+          box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.15);
         }
 
         .btn-action-rojo {
@@ -261,9 +261,10 @@ const CajaHome = () => {
           display: flex;
           flex-direction: column;
           gap: 12px;
-          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15);
           box-sizing: border-box;
-          border-top: 5px solid #dc2626;
+          border: 1px solid #e5e7eb;
+          border-top: 5px solid #6b7280;
         }
 
         .modal-content-large {
@@ -274,8 +275,9 @@ const CajaHome = () => {
           border-radius: 16px;
           display: flex;
           flex-direction: column;
-          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15);
           overflow: hidden;
+          border: 1px solid #e5e7eb;
         }
       `}</style>
 
@@ -319,9 +321,9 @@ const CajaHome = () => {
         <div style={styles.modalOverlay}>
           <div className="modal-card">
             <div style={styles.modalHeader}>
-              <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#991b1b' }}>💵 APERTURA DE CAJA</h3>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#111827' }}>💵 APERTURA DE CAJA</h3>
             </div>
-            <p style={{ fontSize: '0.85rem', color: '#7f1d1d', margin: 0 }}>
+            <p style={{ fontSize: '0.85rem', color: '#374151', margin: 0 }}>
               Ingrese el monto en efectivo disponible en la caja al iniciar el turno.
             </p>
             <input
@@ -344,7 +346,7 @@ const CajaHome = () => {
         <div style={styles.modalOverlay}>
           <div className="modal-content-large">
             <div style={styles.modalHeader}>
-              <h2 style={{ margin: 0, fontSize: '1.1rem', color: '#991b1b' }}>CONSULTA DE STOCK Y PRECIOS</h2>
+              <h2 style={{ margin: 0, fontSize: '1.1rem', color: '#111827' }}>CONSULTA DE STOCK Y PRECIOS</h2>
               <button onClick={() => setShowCatalog(false)} style={styles.btnCloseModal}>✕ Cerrar</button>
             </div>
             <div style={styles.modalBody}><StockCatalog /></div>
@@ -357,10 +359,10 @@ const CajaHome = () => {
         <div style={styles.modalOverlay}>
           <div className="modal-card">
             <div style={styles.modalHeader}>
-              <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#991b1b' }}>🗑️ REGISTRAR SOBRANTE / MERMA</h3>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#111827' }}>🗑️ REGISTRAR SOBRANTE / MERMA</h3>
               <button onClick={() => setShowWasteModal(false)} style={styles.btnCloseModal}>✕</button>
             </div>
-            <p style={{ fontSize: '0.85rem', color: '#7f1d1d', margin: 0 }}>
+            <p style={{ fontSize: '0.85rem', color: '#374151', margin: 0 }}>
               Seleccione el producto de panadería que sobró para descontarlo del stock y reportarlo.
             </p>
             <select
@@ -405,7 +407,7 @@ const CajaHome = () => {
         <div style={styles.modalOverlay}>
           <div className="modal-card">
             <div style={styles.modalHeader}>
-              <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#991b1b' }}>🔒 ARQUEO Y CIERRE DE TURNO</h3>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#111827' }}>🔒 ARQUEO Y CIERRE DE TURNO</h3>
               <button onClick={() => setShowCierreModal(false)} style={styles.btnCloseModal}>✕</button>
             </div>
 
@@ -420,22 +422,22 @@ const CajaHome = () => {
               </div>
               <div style={styles.resumenRow}>
                 <span>Ventas en Efectivo:</span>
-                <strong style={{ color: '#991b1b' }}>+ ${totalEfectivoVentas.toFixed(2)}</strong>
+                <strong style={{ color: '#111827' }}>+ ${totalEfectivoVentas.toFixed(2)}</strong>
               </div>
               <div style={styles.resumenRow}>
                 <span>Cobros Digitales:</span>
-                <strong style={{ color: '#be123c' }}>${totalDigital.toFixed(2)}</strong>
+                <strong style={{ color: '#111827' }}>${totalDigital.toFixed(2)}</strong>
               </div>
 
-              <hr style={{ border: 'none', borderTop: '1px solid #fca5a5', margin: '4px 0' }} />
+              <hr style={{ border: 'none', borderTop: '1px solid #e5e7eb', margin: '4px 0' }} />
 
-              <div style={{ ...styles.resumenRow, backgroundColor: '#ffffff', padding: '6px 8px', borderRadius: '6px', border: '1px solid #fca5a5' }}>
-                <span style={{ fontWeight: 'bold', color: '#991b1b' }}>EFECTIVO ESPERADO EN CAJA:</span>
-                <strong style={{ fontSize: '1rem', color: '#991b1b' }}>${efectivoEsperadoEnCaja.toFixed(2)}</strong>
+              <div style={{ ...styles.resumenRow, backgroundColor: '#f9fafb', padding: '6px 8px', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
+                <span style={{ fontWeight: 'bold', color: '#111827' }}>EFECTIVO ESPERADO EN CAJA:</span>
+                <strong style={{ fontSize: '1rem', color: '#111827' }}>${efectivoEsperadoEnCaja.toFixed(2)}</strong>
               </div>
 
               <div style={{ marginTop: '6px' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#7f1d1d', display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#374151', display: 'block', marginBottom: '4px' }}>
                   💵 Efectivo Real Contado en Caja ($):
                 </label>
                 <input
@@ -443,7 +445,7 @@ const CajaHome = () => {
                   placeholder="Ej. 12500"
                   value={actualCashInput}
                   onChange={(e) => setActualCashInput(e.target.value)}
-                  style={{ ...styles.inputForm, border: '2px solid #dc2626', fontSize: '1rem', fontWeight: 'bold' }}
+                  style={{ ...styles.inputForm, border: '2px solid #9ca3af', fontSize: '1rem', fontWeight: 'bold', color: '#111827' }}
                   disabled={isSubmitting}
                 />
               </div>
@@ -456,11 +458,11 @@ const CajaHome = () => {
                   fontWeight: 'bold',
                   textAlign: 'center',
                   backgroundColor: '#ffffff',
-                  color: diferenciaCaja === 0 ? '#991b1b' : diferenciaCaja > 0 ? '#be123c' : '#dc2626',
-                  border: `1px solid ${diferenciaCaja === 0 ? '#fca5a5' : diferenciaCaja > 0 ? '#fecdd3' : '#fecaca'}`
+                  color: diferenciaCaja === 0 ? '#059669' : diferenciaCaja > 0 ? '#2563eb' : '#dc2626',
+                  border: `1px solid ${diferenciaCaja === 0 ? '#10b981' : diferenciaCaja > 0 ? '#3b82f6' : '#ef4444'}`
                 }}>
                   {diferenciaCaja === 0 && '✅ Caja Cuadrada Perfecta'}
-                  {diferenciaCaja > 0 && `🔴 Sobrante en Caja: +$${diferenciaCaja.toFixed(2)}`}
+                  {diferenciaCaja > 0 && `🔵 Sobrante en Caja: +$${diferenciaCaja.toFixed(2)}`}
                   {diferenciaCaja < 0 && `⚠️ Faltante en Caja: -$${Math.abs(diferenciaCaja).toFixed(2)}`}
                 </div>
               )}
@@ -482,12 +484,12 @@ const CajaHome = () => {
 
 const styles = {
   btnLinkEdit: { background: 'none', border: 'none', color: '#ffffff', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.85rem', padding: 0, fontWeight: 'bold' },
-  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '12px' },
-  modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '6px', borderBottom: '1px solid #fca5a5' },
-  btnCloseModal: { backgroundColor: '#fecaca', color: '#991b1b', border: 'none', padding: '6px 10px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.8rem' },
+  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.4)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '12px' },
+  modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '6px', borderBottom: '1px solid #e5e7eb' },
+  btnCloseModal: { backgroundColor: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', padding: '6px 10px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.8rem' },
   modalBody: { padding: '10px', overflowY: 'auto', flex: 1 },
-  resumenRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem', color: '#7f1d1d' },
-  inputForm: { padding: '8px 10px', borderRadius: '8px', border: '1px solid #fca5a5', fontSize: '0.9rem', width: '100%', boxSizing: 'border-box' }
+  resumenRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem', color: '#374151' },
+  inputForm: { padding: '8px 10px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '0.9rem', width: '100%', boxSizing: 'border-box', color: '#111827' }
 };
 
 export default CajaHome;
