@@ -224,7 +224,7 @@ const SuppliersManager = () => {
                   <th style={styles.th}>N° Remito / Factura</th>
                   <th style={styles.th}>Estado</th>
                   <th style={styles.th}>Monto Total ($)</th>
-                  <th style={styles.th}>Acción</th>
+                  <th style={{ ...styles.th, textAlign: 'right' }}>Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -239,8 +239,8 @@ const SuppliersManager = () => {
                       <td style={{ ...styles.td, color: '#dc2626', fontWeight: 'bold' }}>
                         ${parseFloat(p.totalAmount || 0).toFixed(2)}
                       </td>
-                      <td style={styles.td}>
-                        <div style={{ display: 'flex', gap: '6px' }}>
+                      <td style={{ ...styles.td, textAlign: 'right' }}>
+                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
                           <button
                             onClick={() => setEditingTransaction(p)}
                             style={{
@@ -403,28 +403,44 @@ const SuppliersManager = () => {
             <button type="submit" style={styles.btnPrimary}>Asentar Egreso</button>
           </form>
 
-          <h2 style={{ ...styles.cardTitle, marginTop: '20px' }}>HISTORIAL DE EGRESOS Y FACTURAS</h2>
+          <h2 style={{ ...styles.cardTitle, marginTop: '20px' }}>HISTORIAL DE INGRESOS Y COMPRAS DE MERCADERÍA</h2>
           <table style={styles.table}>
             <thead>
               <tr style={styles.trHead}>
                 <th style={styles.th}>Fecha</th>
-                <th style={styles.th}>Proveedor / Rubro</th>
+                <th style={styles.th}>Proveedor</th>
                 <th style={styles.th}>N° Comprobante</th>
-                <th style={styles.th}>Descripción</th>
                 <th style={styles.th}>Medio Pago</th>
                 <th style={styles.th}>Monto Total ($)</th>
+                <th style={{ ...styles.th, textAlign: 'right' }}>Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {expenses.map((exp) => (
-                <tr key={exp._id || exp.id} style={styles.trBody}>
-                  <td style={styles.td}>{new Date(exp.createdAt || Date.now()).toLocaleDateString('es-AR')}</td>
-                  <td style={styles.td}><strong>{exp.supplierName || exp.category}</strong></td>
-                  <td style={styles.td}>{exp.invoiceNumber || '-'}</td>
-                  <td style={styles.td}>{exp.description}</td>
-                  <td style={styles.td}>{exp.paymentMethod}</td>
+              {purchases.map((p) => (
+                <tr key={p._id || p.id} style={styles.trBody}>
+                  <td style={styles.td}>{new Date(p.createdAt || Date.now()).toLocaleDateString('es-AR')}</td>
+                  <td style={styles.td}><strong>{p.supplierName}</strong></td>
+                  <td style={styles.td}>{p.invoiceNumber || '-'}</td>
+                  <td style={styles.td}>{p.paymentMethod}</td>
                   <td style={{ ...styles.td, color: '#dc2626', fontWeight: 'bold' }}>
-                    -${parseFloat(exp.amount || 0).toFixed(2)}
+                    -${parseFloat(p.totalAmount || 0).toFixed(2)}
+                  </td>
+                  <td style={{ ...styles.td, textAlign: 'right' }}>
+                    <button
+                      onClick={() => setEditingTransaction(p)}
+                      style={{
+                        backgroundColor: '#2563eb',
+                        color: '#fff',
+                        border: 'none',
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '0.75rem',
+                        fontWeight: 'bold'
+                      }}
+                    >
+                      ✏️ Editar
+                    </button>
                   </td>
                 </tr>
               ))}
