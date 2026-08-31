@@ -1,16 +1,40 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const puppeteer = require('puppeteer');
+const fs = require('fs');
 
 let client;
 let isReady = false;
+
+const getExecutablePath = () => {
+  // Intentar la ruta auto-detectada por puppeteer
+  try {
+    const pPath = puppeteer.executablePath();
+    if (pPath && fs.existsSync(pPath)) return pPath;
+  } catch (e) {
+    // Si falla continua a las rutas por defecto
+  }
+
+  // Rutas habituales de Chromium en entornos Linux / Render
+  const linuxPaths = [
+    '/usr/bin/chromium-browser',
+    '/usr/bin/chromium',
+    '/usr/bin/google-chrome-stable'
+  ];
+
+  for (const path of linuxPaths) {
+    if (fs.existsSync(path)) return path;
+  }
+
+  return puppeteer.executablePath();
+};
 
 const initWhatsApp = () => {
   client = new Client({
     authStrategy: new LocalAuth({ dataPath: './whatsapp_auth' }),
     puppeteer: {
       headless: true,
-      executablePath: puppeteer.executablePath(),
+      executablePath: getExecutablePath(),
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
