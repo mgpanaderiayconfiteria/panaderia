@@ -7,7 +7,6 @@ let client;
 let isReady = false;
 
 const getExecutablePath = () => {
-  // Intentar la ruta auto-detectada por puppeteer
   try {
     const pPath = puppeteer.executablePath();
     if (pPath && fs.existsSync(pPath)) return pPath;
@@ -15,7 +14,6 @@ const getExecutablePath = () => {
     // Si falla continua a las rutas por defecto
   }
 
-  // Rutas habituales de Chromium en entornos Linux / Render
   const linuxPaths = [
     '/usr/bin/chromium-browser',
     '/usr/bin/chromium',
@@ -50,6 +48,7 @@ const initWhatsApp = () => {
 
   client.on('qr', (qr) => {
     console.log('📱 ESCANEA ESTE CÓDIGO QR CON WHATSAPP PARA VINCULAR EL BOT:');
+    // Forzamos el renderizado compacto para evitar que el log de Render deforme el cuadro
     qrcode.generate(qr, { small: true });
   });
 
