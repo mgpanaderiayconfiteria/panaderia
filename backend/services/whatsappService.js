@@ -31,13 +31,16 @@ const getExecutablePath = () => {
 };
 
 const initWhatsApp = () => {
-  // Directorio con permisos de escritura temporales en la nube
   const authPath = process.env.NODE_ENV === 'production' 
     ? path.join('/tmp', 'whatsapp_auth') 
     : path.join(__dirname, '../whatsapp_auth');
 
   client = new Client({
     authStrategy: new LocalAuth({ dataPath: authPath }),
+    webVersionCache: {
+      type: 'remote',
+      remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html'
+    },
     puppeteer: {
       headless: true,
       executablePath: getExecutablePath(),
@@ -48,7 +51,8 @@ const initWhatsApp = () => {
         '--disable-accelerated-2d-canvas',
         '--no-first-run',
         '--disable-gpu',
-        '--no-default-browser-check'
+        '--no-zygote',
+        '--unhandled-rejections=strict'
       ]
     }
   });
@@ -68,14 +72,18 @@ const initWhatsApp = () => {
     qrcodeTerminal.generate(qr, { small: true });
   });
 
-  client.on('ready', () => {
-    console.log('✅ Bot de WhatsApp conectado y listo para enviar alertas!');
-    isReady = true;
-    qrCodeDataUrl = null;
+  client.on('loading_screen', (percent, message) => {
+    console.log(`⏳ Cargando WhatsApp Web: ${percent}% - ${message}`);
   });
 
   client.on('authenticated', () => {
     console.log('🔐 Sesión de WhatsApp autenticada correctamente.');
+  });
+
+  client.on('ready', () => {
+    console.log('✅ Bot de WhatsApp conectado y listo para enviar alertas!');
+    isReady = true;
+    qrCodeDataUrl = null;
   });
 
   client.on('auth_failure', (msg) => {
@@ -86,11 +94,6 @@ const initWhatsApp = () => {
   client.on('disconnected', (reason) => {
     console.warn('⚠️ Bot de WhatsApp desconectado:', reason);
     isReady = false;
-    // Intenta reiniciar si se desconecta
-    setTimeout(() => {
-      console.log('🔄 Reiniciando cliente de WhatsApp...');
-      client.initialize();
-    }, 5000);
   });
 
   client.initialize().catch(err => {
