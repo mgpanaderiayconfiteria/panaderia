@@ -52,7 +52,7 @@ export const SaleProvider = ({ children }) => {
   }, []);
 
   const addSale = async (saleData) => {
-    // Enviamos el flag de la promo al servidor para que este aplique y valide las cuentas
+    // Se agregan los datos fiscales y de envío por correo al payload
     const payload = {
       items: saleData.items || [],
       paymentMethod: saleData.paymentMethod || 'efectivo',
@@ -61,7 +61,13 @@ export const SaleProvider = ({ children }) => {
       changeAmount: saleData.changeAmount || 0,
       seller: saleData.sellerId && saleData.sellerId.length === 24 ? saleData.sellerId : undefined,
       employee: saleData.sellerName || saleData.cashier || 'Empleado Caja',
-      status: saleData.status || 'completed'
+      status: saleData.status || 'completed',
+      // Datos para Facturación y Envío
+      requiresInvoice: saleData.requiresInvoice || false,
+      invoiceType: saleData.invoiceType || null,
+      clientEmail: saleData.clientEmail || null,
+      clientDocNum: saleData.clientDocNum || null,
+      clientName: saleData.clientName || null
     };
 
     try {
@@ -111,7 +117,12 @@ export const SaleProvider = ({ children }) => {
         total: totalFinal,
         paidAmount: saleData.paidAmount || totalFinal,
         changeAmount: saleData.changeAmount || 0,
-        status: saleData.status || 'completed'
+        status: saleData.status || 'completed',
+        requiresInvoice: payload.requiresInvoice,
+        invoiceType: payload.invoiceType,
+        clientEmail: payload.clientEmail,
+        clientDocNum: payload.clientDocNum,
+        clientName: payload.clientName
       };
 
       setSales((prevSales) => [fallbackSale, ...prevSales]);
