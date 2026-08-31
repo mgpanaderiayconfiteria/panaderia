@@ -31,6 +31,11 @@ const NuevoCliente = () => {
   const [digitalGiven, setDigitalGiven] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Campos para Facturación Digital Obligatoria (ARCA/AFIP)
+  const [clientEmail, setClientEmail] = useState('');
+  const [clientDocNum, setClientDocNum] = useState('');
+  const [clientName, setClientName] = useState('');
+
   useEffect(() => {
     if (categories.length > 0 && !categories.includes(activeCategory)) {
       setActiveCategory(categories[0]);
@@ -71,6 +76,7 @@ const NuevoCliente = () => {
   const calculatedSubtotal = useMemo(() => {
     if (!selectedProduct || !quantity || isNaN(parseFloat(quantity))) return 0;
     const val = parseFloat(quantity);
+    if (val <= 0) return 0;
     const basePrice = parseFloat(selectedProduct.priceKg || selectedProduct.price || selectedProduct.priceUnit || 0);
 
     if (sellMode === 'unit') {
@@ -179,6 +185,17 @@ const NuevoCliente = () => {
     return given >= totalCart ? given - totalCart : 0;
   }, [digitalGiven, totalCart]);
 
+  const resetCheckoutState = () => {
+    setShowCheckoutModal(false);
+    setCart([]);
+    setCashGiven('');
+    setDigitalGiven('');
+    setClientEmail('');
+    setClientDocNum('');
+    setClientName('');
+    setPaymentStep('select_method');
+  };
+
   const handleConfirmCashSale = async () => {
     const given = parseFloat(cashGiven) || 0;
     if (given < finalCashTotal) return;
@@ -197,17 +214,14 @@ const NuevoCliente = () => {
         total: finalCashTotal,
         paidAmount: given,
         changeAmount: changeCashAmount,
+        requiresInvoice: false,
         timestamp: new Date().toISOString()
       });
 
-      setShowCheckoutModal(false);
-      setCart([]);
-      setCashGiven('');
-      setDigitalGiven('');
-      setPaymentStep('select_method');
+      resetCheckoutState();
       navigate('/caja');
     } catch (e) {
-      alert('Error al procesar la venta.');
+      alert('Error al procesar la venta en efectivo.');
     } finally {
       setIsSubmitting(false);
     }
@@ -219,6 +233,11 @@ const NuevoCliente = () => {
 
     setIsSubmitting(true);
     try {
+      // Regla ARCA/AFIP: Si el operador no coloca datos, se emite a Consumidor Final genérico
+      const finalDoc = clientDocNum.trim() || '0';
+      const finalName = clientName.trim() || 'Consumidor Final';
+      const finalEmail = clientEmail.trim() || null;
+
       await addSale({
         sellerId: user?._id || user?.id,
         sellerName: user?.name || user?.email || 'Empleado Caja',
@@ -231,17 +250,18 @@ const NuevoCliente = () => {
         total: totalCart,
         paidAmount: given,
         changeAmount: changeDigitalAmount,
+        requiresInvoice: true, // FLAG OBLIGATORIO PARA EL BACKEND/AFIP
+        invoiceType: 'C',
+        clientEmail: finalEmail,
+        clientDocNum: finalDoc,
+        clientName: finalName,
         timestamp: new Date().toISOString()
       });
 
-      setShowCheckoutModal(false);
-      setCart([]);
-      setCashGiven('');
-      setDigitalGiven('');
-      setPaymentStep('select_method');
+      resetCheckoutState();
       navigate('/caja');
     } catch (e) {
-      alert('Error al procesar la venta.');
+      alert('Error al procesar la venta digital / facturación.');
     } finally {
       setIsSubmitting(false);
     }
@@ -384,7 +404,6 @@ const NuevoCliente = () => {
       {activeTab === 'catalog' && (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           
-          {/* BARRA DE CATEGORÍAS */}
           <div className="category-bar">
             {categories.map((cat) => (
               <button
@@ -402,7 +421,6 @@ const NuevoCliente = () => {
             ))}
           </div>
 
-          {/* BARRA DE SUBCATEGORÍAS DINÁMICAS (SI EXISTEN) */}
           {subcategories.length > 1 && (
             <div className="subcategory-bar">
               {subcategories.map((sub) => (
@@ -556,7 +574,7 @@ const NuevoCliente = () => {
                 {sellMode === 'portion' && 'Ingrese cantidad de porciones:'}
                 {sellMode === 'amount' && 'Ingrese monto exacto en $:'}
               </label>
-              <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="0" autoFocus style={styles.touchInput} />
+              <input type="number" min="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="0" autoFocus style={styles.touchInput} />
             </div>
 
             <div style={styles.subtotalDisplay}>
@@ -597,12 +615,12 @@ const NuevoCliente = () => {
 
                 <button 
                   onClick={() => {
-                    setDigitalGiven('');
+                    setDigitalGiven(totalCart.toString());
                     setPaymentStep('digital_details');
                   }} 
                   style={styles.btnMethodDigital}
                 >
-                  💳 PAGO DIGITAL (SIN DESCUENTO)
+                  💳 PAGO DIGITAL (FACTURA C AUTOMÁTICA)
                 </button>
               </div>
             )}
@@ -675,45 +693,67 @@ const NuevoCliente = () => {
               </div>
             )}
 
-            {/* DETALLES DE PAGO DIGITAL */}
+            {/* DETALLES DE PAGO DIGITAL (FACTURACIÓN OBLIGATORIA) */}
             {paymentStep === 'digital_details' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div style={{ ...styles.summaryBox, backgroundColor: '#eff6ff', border: '1px solid #bfdbfe' }}>
-                  <span style={{ fontWeight: 'bold', color: '#1e40af' }}>TOTAL A TRANSFERIR / PAGAR:</span>
+                  <span style={{ fontWeight: 'bold', color: '#1e40af' }}>TOTAL A FACTURAR Y PAGAR:</span>
                   <strong style={{ fontSize: '1.3rem', color: '#2563eb' }}>${totalCart.toFixed(2)}</strong>
                 </div>
 
+                <div style={{ backgroundColor: '#f0f9ff', padding: '10px', borderRadius: '8px', border: '1px solid #bae6fd', fontSize: '0.8rem', color: '#0369a1' }}>
+                  ⚡ <strong>Facturación automática:</strong> Si deja los campos vacíos, se emitirá como <strong>Factura C a Consumidor Final</strong>.
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#374151' }}>Nombre / Razón Social (Opcional):</label>
+                    <input
+                      type="text"
+                      placeholder="Consumidor Final"
+                      value={clientName}
+                      onChange={(e) => setClientName(e.target.value)}
+                      style={{ ...styles.touchInput, fontSize: '0.9rem', padding: '8px', textAlign: 'left' }}
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#374151' }}>DNI / CUIT (Opcional):</label>
+                    <input
+                      type="text"
+                      placeholder="0 (Sin DNI)"
+                      value={clientDocNum}
+                      onChange={(e) => setClientDocNum(e.target.value)}
+                      style={{ ...styles.touchInput, fontSize: '0.9rem', padding: '8px', textAlign: 'left' }}
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#374151' }}>Email para envío de Comprobante (Opcional):</label>
+                    <input
+                      type="email"
+                      placeholder="cliente@ejemplo.com"
+                      value={clientEmail}
+                      onChange={(e) => setClientEmail(e.target.value)}
+                      style={{ ...styles.touchInput, fontSize: '0.9rem', padding: '8px', textAlign: 'left' }}
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                </div>
+
                 <div style={styles.inputGroup}>
-                  <label style={styles.inputLabel}>Monto transferido / abonado ($):</label>
+                  <label style={styles.inputLabel}>Monto transferido / cobrado ($):</label>
                   <input
                     type="number"
                     value={digitalGiven}
                     onChange={(e) => setDigitalGiven(e.target.value)}
                     placeholder="Monto recibido digitalmente"
-                    autoFocus
                     style={{ ...styles.touchInput, borderColor: '#2563eb' }}
                     disabled={isSubmitting}
                   />
                 </div>
 
-                <div style={styles.quickPresetsRow}>
-                  <button onClick={() => setDigitalGiven(totalCart.toString())} style={styles.presetBtn} disabled={isSubmitting}>Monto Exacto</button>
-                  <button onClick={() => setDigitalGiven('1000')} style={styles.presetBtn} disabled={isSubmitting}>$1.000</button>
-                  <button onClick={() => setDigitalGiven('2000')} style={styles.presetBtn} disabled={isSubmitting}>$2.000</button>
-                  <button onClick={() => setDigitalGiven('5000')} style={styles.presetBtn} disabled={isSubmitting}>$5.000</button>
-                  <button onClick={() => setDigitalGiven('10000')} style={styles.presetBtn} disabled={isSubmitting}>$10.000</button>
-                </div>
-
-                {changeDigitalAmount > 0 && (
-                  <div style={{ ...styles.subtotalDisplay, backgroundColor: '#eff6ff' }}>
-                    <span style={{ fontSize: '0.9rem', color: '#1e40af' }}>DIFERENCIA / SALDO:</span>
-                    <strong style={{ fontSize: '1.4rem', color: '#2563eb' }}>
-                      ${changeDigitalAmount.toFixed(2)}
-                    </strong>
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', gap: '10px' }}>
+                <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
                   <button onClick={() => setPaymentStep('select_method')} style={{ ...styles.btnVolver, flex: 1 }} disabled={isSubmitting}>
                     Volver
                   </button>
@@ -727,7 +767,7 @@ const NuevoCliente = () => {
                       cursor: ((parseFloat(digitalGiven) || 0) < totalCart || isSubmitting) ? 'not-allowed' : 'pointer'
                     }}
                   >
-                    {isSubmitting ? 'PROCESANDO...' : 'CONFIRMAR VENTA DIGITAL'}
+                    {isSubmitting ? 'FACTURANDO Y PROCESANDO...' : 'EMITIR FACTURA Y COBRAR'}
                   </button>
                 </div>
               </div>

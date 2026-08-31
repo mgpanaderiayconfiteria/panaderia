@@ -2,6 +2,8 @@ const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
 const { sendStockAlert } = require('../services/whatsappService');
+const { emitirFacturaC } = require('../services/afipService');
+const { enviarFacturaEmail } = require('../services/emailService');
 
 // 1. Crear una nueva orden / venta
 const createOrder = async (req, res) => {
@@ -12,7 +14,12 @@ const createOrder = async (req, res) => {
       isCashDiscountActive, 
       paidAmount, 
       seller, 
-      employee 
+      employee,
+      // Campos opcionales para la Facturación ARCA / Email
+      clientEmail,
+      clientDocType,
+      clientDocNum,
+      clientName
     } = req.body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -74,6 +81,38 @@ const createOrder = async (req, res) => {
       validSeller = req.user._id;
     }
 
+    // === EMISIÓN DE FACTURA ELECTRÓNICA Y ENVÍO POR MAIL ===
+    let invoiceInfo = null;
+
+    if (method === 'digital') {
+      try {
+        const afipRes = await emitirFacturaC({
+          amount: calculatedTotal,
+          docType: clientDocNum ? (clientDocType || 96) : 99, // 99 = Consumidor Final
+          docNum: clientDocNum || 0,
+          clientName: clientName || 'Consumidor Final'
+        });
+
+        invoiceInfo = {
+          cae: afipRes.cae,
+          caeVto: afipRes.caeVto,
+          cbteNro: afipRes.cbteNro,
+          ptoVta: afipRes.ptoVta
+        };
+
+        // Si se envió un correo, disparar la notificación de forma asíncrona
+        if (clientEmail) {
+          enviarFacturaEmail(clientEmail, {
+            ...invoiceInfo,
+            amount: calculatedTotal
+          });
+        }
+      } catch (afipError) {
+        console.error('⚠️ No se pudo autorizar la factura en ARCA:', afipError.message);
+        // Podés decidir si interrumpir la compra o guardar la orden con un estado de advertencia
+      }
+    }
+
     const order = new Order({
       items: formattedItems,
       subtotal: calculatedSubtotal,
@@ -85,6 +124,7 @@ const createOrder = async (req, res) => {
       paymentMethod: method,
       seller: validSeller,
       employee: employee || (req.user ? req.user.name : 'Empleado Caja'),
+      invoice: invoiceInfo,
       status: 'completed'
     });
 
