@@ -38,7 +38,7 @@ const initWhatsApp = () => {
   client = new Client({
     authStrategy: new LocalAuth({ dataPath: authPath }),
     puppeteer: {
-      headless: 'shell', // Modo más liviano para entornos Linux en la nube
+      headless: 'shell',
       executablePath: getExecutablePath(),
       args: [
         '--no-sandbox',
@@ -49,14 +49,31 @@ const initWhatsApp = () => {
         '--no-zygote',
         '--disable-gpu',
         '--disable-software-rasterizer',
-        '--disable-extensions'
+        '--disable-extensions',
+        '--disable-component-update',
+        '--disable-background-networking',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-breakpad',
+        '--disable-client-side-phishing-detection',
+        '--disable-default-apps',
+        '--disable-hang-monitor',
+        '--disable-popup-blocking',
+        '--disable-prompt-on-repost',
+        '--disable-sync',
+        '--disable-translate',
+        '--metrics-recording-only',
+        '--no-default-browser-check',
+        '--safebrowsing-disable-auto-update',
+        '--disable-speech-api',
+        '--js-flags=--max-old-space-size=180'
       ]
     }
   });
 
   client.on('qr', async (qr) => {
     try {
-      qrCodeDataUrl = await QRCode.toDataURL(qr, { margin: 2, width: 400 });
+      qrCodeDataUrl = await QRCode.toDataURL(qr, { margin: 2, width: 320 });
     } catch (err) {
       console.error('Error al generar DataURL del QR:', err);
     }
