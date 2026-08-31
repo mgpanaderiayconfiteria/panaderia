@@ -34,7 +34,7 @@ const AdminPanel = () => {
   // Estado para controlar la apertura general del contenedor de ventas
   const [isAllSalesExpanded, setIsAllSalesExpanded] = useState(false);
 
-  // Estado para filtrado por fecha específica
+  // Estado para filtrado por fecha específica (por defecto se inicia en hoy, pero permite vaciarlo para ver el histórico total)
   const [selectedDate, setSelectedDate] = useState(getLocalDateString());
 
   useEffect(() => {
@@ -49,7 +49,7 @@ const AdminPanel = () => {
   };
 
   const handleDeleteSale = async (saleId, e) => {
-    e.stopPropagation(); // Evitar que el clic en anular despliegue/cierre el renglón
+    e.stopPropagation(); // Evitar que el clic en anular desplegue/cierre el renglón
     const confirmDelete = window.confirm(
       '¿Estás seguro de eliminar esta venta? El dinero se descontará de la caja y el stock de los productos será restaurado automáticamente.'
     );
@@ -248,10 +248,11 @@ const AdminPanel = () => {
 
   return (
     <div style={styles.dashboardContainer}>
+      {/* Se pasa 'sales' completo para que Analytics tenga el historial total mensual */}
       <AnalyticsModal 
         isOpen={showAnalyticsModal}
         onClose={() => setShowAnalyticsModal(false)}
-        sales={filteredSales}
+        sales={sales}
         products={products}
       />
 
@@ -371,7 +372,7 @@ const AdminPanel = () => {
           <div style={styles.headerRow}>
             <h1 style={styles.pageTitle}>PANEL DE CONTROL MG PANADERÍA</h1>
             <div style={styles.dateSelector}>
-              <span style={styles.dateButton}>📅 Consultar Día:</span>
+              <span style={styles.dateButton}>📅 Filtrar Día:</span>
               <input
                 type="date"
                 value={selectedDate}
@@ -383,6 +384,13 @@ const AdminPanel = () => {
                 style={styles.btnResetDate}
               >
                 Hoy
+              </button>
+              <button 
+                onClick={() => setSelectedDate('')} 
+                style={{ ...styles.btnResetDate, backgroundColor: '#475569' }}
+                title="Ver ventas e historial acumulado de todos los días"
+              >
+                Ver Todo (Histórico)
               </button>
             </div>
           </div>
@@ -491,7 +499,7 @@ const AdminPanel = () => {
           </div>
 
           <div style={{ ...styles.card, marginBottom: '20px' }}>
-            <h2 style={styles.cardTitle}>VENTAS AUDITADAS POR VENDEDOR / CAJERA ({selectedDate || 'Histórico'})</h2>
+            <h2 style={styles.cardTitle}>VENTAS AUDITADAS POR VENDEDOR / CAJERA ({selectedDate || 'Histórico Total'})</h2>
             {Object.keys(salesBySeller).length === 0 ? (
               <p style={styles.emptyText}>No hay ventas registradas para esta fecha.</p>
             ) : (
@@ -539,7 +547,7 @@ const AdminPanel = () => {
             >
               <div>
                 <h2 style={{ ...styles.cardTitle, margin: 0 }}>
-                  DETALLE DE VENTAS DE LA JORNADA ({selectedDate || 'Histórico'})
+                  DETALLE DE VENTAS DE LA JORNADA ({selectedDate || 'Histórico Total'})
                 </h2>
                 <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
                   Total de transacciones: <strong>{filteredSales.length}</strong>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import RegistrarIngresoCaja from './RegistrarIngresoCaja';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -9,6 +9,9 @@ const SuppliersManager = () => {
   const [expenses, setExpenses] = useState([]);
   const [purchases, setPurchases] = useState([]);
   const [editingTransaction, setEditingTransaction] = useState(null);
+
+  // Buscador rápido para localizar facturas por proveedor o N° Remito/Factura
+  const [searchFilter, setSearchFilter] = useState('');
 
   // Formulario Proveedor
   const [supplierForm, setSupplierForm] = useState({ name: '', cuit: '', phone: '', category: '' });
@@ -136,52 +139,87 @@ const SuppliersManager = () => {
   const supplierDebts = getSupplierDebts();
   const totalDebtAll = supplierDebts.reduce((acc, curr) => acc + curr.totalPending, 0);
 
+  // Filtrado dinámico de compras e ingresos por el campo de búsqueda
+  const filteredPurchases = useMemo(() => {
+    if (!searchFilter.trim()) return purchases;
+    const term = searchFilter.toLowerCase();
+    return purchases.filter((p) => {
+      const supplierName = (p.supplierName || '').toLowerCase();
+      const invoiceNumber = (p.invoiceNumber || '').toLowerCase();
+      return supplierName.includes(term) || invoiceNumber.includes(term);
+    });
+  }, [purchases, searchFilter]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Selector SubPestañas */}
-      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-        <button
-          onClick={() => setActiveSubTab('expenses')}
-          style={{
-            padding: '8px 16px',
-            borderRadius: '6px',
-            border: 'none',
-            backgroundColor: activeSubTab === 'expenses' ? '#0f2337' : '#cbd5e1',
-            color: activeSubTab === 'expenses' ? '#fff' : '#1e293b',
-            fontWeight: 'bold',
-            cursor: 'pointer'
-          }}
-        >
-          🧾 Facturas y Gastos
-        </button>
-        <button
-          onClick={() => setActiveSubTab('debts')}
-          style={{
-            padding: '8px 16px',
-            borderRadius: '6px',
-            border: 'none',
-            backgroundColor: activeSubTab === 'debts' ? '#0f2337' : '#cbd5e1',
-            color: activeSubTab === 'debts' ? '#fff' : '#1e293b',
-            fontWeight: 'bold',
-            cursor: 'pointer'
-          }}
-        >
-          📊 Cuentas Corrientes / Deudas {totalDebtAll > 0 && `($${totalDebtAll.toFixed(2)})`}
-        </button>
-        <button
-          onClick={() => setActiveSubTab('suppliers')}
-          style={{
-            padding: '8px 16px',
-            borderRadius: '6px',
-            border: 'none',
-            backgroundColor: activeSubTab === 'suppliers' ? '#0f2337' : '#cbd5e1',
-            color: activeSubTab === 'suppliers' ? '#fff' : '#1e293b',
-            fontWeight: 'bold',
-            cursor: 'pointer'
-          }}
-        >
-          🏭 Alta de Proveedores
-        </button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setActiveSubTab('expenses')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: 'none',
+              backgroundColor: activeSubTab === 'expenses' ? '#0f2337' : '#cbd5e1',
+              color: activeSubTab === 'expenses' ? '#fff' : '#1e293b',
+              fontWeight: 'bold',
+              cursor: 'pointer'
+            }}
+          >
+            🧾 Facturas y Gastos
+          </button>
+          <button
+            onClick={() => setActiveSubTab('debts')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: 'none',
+              backgroundColor: activeSubTab === 'debts' ? '#0f2337' : '#cbd5e1',
+              color: activeSubTab === 'debts' ? '#fff' : '#1e293b',
+              fontWeight: 'bold',
+              cursor: 'pointer'
+            }}
+          >
+            📊 Cuentas Corrientes / Deudas {totalDebtAll > 0 && `($${totalDebtAll.toFixed(2)})`}
+          </button>
+          <button
+            onClick={() => setActiveSubTab('suppliers')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: 'none',
+              backgroundColor: activeSubTab === 'suppliers' ? '#0f2337' : '#cbd5e1',
+              color: activeSubTab === 'suppliers' ? '#fff' : '#1e293b',
+              fontWeight: 'bold',
+              cursor: 'pointer'
+            }}
+          >
+            🏭 Alta de Proveedores
+          </button>
+        </div>
+
+        {/* Buscador inteligente de comprobantes */}
+        {(activeSubTab === 'expenses' || activeSubTab === 'debts') && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#475569' }}>🔍 Buscar Factura:</span>
+            <input
+              type="text"
+              placeholder="Proveedor o N° Remito..."
+              value={searchFilter}
+              onChange={(e) => setSearchFilter(e.target.value)}
+              style={{ padding: '6px 10px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '0.8rem' }}
+            />
+            {searchFilter && (
+              <button
+                onClick={() => setSearchFilter('')}
+                style={{ background: '#e2e8f0', border: 'none', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}
+              >
+                Limpiar
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {activeSubTab === 'debts' ? (
@@ -215,7 +253,7 @@ const SuppliersManager = () => {
 
           {/* Historial Individual de Ingresos Pendientes / A Cuenta */}
           <div style={styles.card}>
-            <h2 style={styles.cardTitle}>DETALLE DE INGRESOS A CUENTA (PENDIENTES DE PAGO)</h2>
+            <h2 style={styles.cardTitle}>DETALLE DE INGRESOS A CUENTA (PENDIENTES DE PAGO HISTÓRICOS)</h2>
             <table style={styles.table}>
               <thead>
                 <tr style={styles.trHead}>
@@ -228,7 +266,7 @@ const SuppliersManager = () => {
                 </tr>
               </thead>
               <tbody>
-                {purchases
+                {filteredPurchases
                   .filter((p) => p.paymentMethod === 'Pendiente' || p.isPaid === false)
                   .map((p) => (
                     <tr key={p._id || p.id} style={styles.trBody}>
@@ -403,7 +441,7 @@ const SuppliersManager = () => {
             <button type="submit" style={styles.btnPrimary}>Asentar Egreso</button>
           </form>
 
-          <h2 style={{ ...styles.cardTitle, marginTop: '20px' }}>HISTORIAL DE INGRESOS Y COMPRAS DE MERCADERÍA</h2>
+          <h2 style={{ ...styles.cardTitle, marginTop: '20px' }}>HISTORIAL COMPLETO DE FACTURAS, INGRESOS Y COMPRAS</h2>
           <table style={styles.table}>
             <thead>
               <tr style={styles.trHead}>
@@ -416,7 +454,7 @@ const SuppliersManager = () => {
               </tr>
             </thead>
             <tbody>
-              {purchases.map((p) => (
+              {filteredPurchases.map((p) => (
                 <tr key={p._id || p.id} style={styles.trBody}>
                   <td style={styles.td}>{new Date(p.createdAt || Date.now()).toLocaleDateString('es-AR')}</td>
                   <td style={styles.td}><strong>{p.supplierName}</strong></td>
@@ -439,7 +477,7 @@ const SuppliersManager = () => {
                         fontWeight: 'bold'
                       }}
                     >
-                      ✏️ Editar
+                      ✏️ Editar Factura
                     </button>
                   </td>
                 </tr>
