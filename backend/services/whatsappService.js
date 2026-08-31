@@ -14,7 +14,7 @@ const getExecutablePath = () => {
     const pPath = puppeteer.executablePath();
     if (pPath && fs.existsSync(pPath)) return pPath;
   } catch (e) {
-    // Si falla continua a las rutas por defecto
+    // Si falla continua
   }
 
   const linuxPaths = [
@@ -38,7 +38,7 @@ const initWhatsApp = () => {
   client = new Client({
     authStrategy: new LocalAuth({ dataPath: authPath }),
     puppeteer: {
-      headless: true,
+      headless: 'shell', // Modo más liviano para entornos Linux en la nube
       executablePath: getExecutablePath(),
       args: [
         '--no-sandbox',
