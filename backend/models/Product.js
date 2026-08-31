@@ -55,6 +55,12 @@ const productSchema = new mongoose.Schema({
   stockGrams: { type: Number, default: 0, min: 0 },
   stockPorciones: { type: Number, default: 0, min: 0 },
 
+  // Umbrales de Stock Mínimo Personalizado
+  minStockUnits: { type: Number, default: 0, min: 0 },
+  minStockGrams: { type: Number, default: 0, min: 0 },
+  minStockPorciones: { type: Number, default: 0, min: 0 },
+  alertSent: { type: Boolean, default: false },
+
   // Campos retrocompatibles
   stock: { type: Number, default: 0, min: 0 },
   stockUnit: {

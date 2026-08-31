@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
 const Order = require('../models/Order');
+const Product = require('../models/Product');
+const { sendStockAlert } = require('../services/whatsappService');
 
 // 1. Crear una nueva orden / venta
 const createOrder = async (req, res) => {
@@ -27,18 +29,14 @@ const createOrder = async (req, res) => {
       
       let itemSubtotal = parseFloat(item.subtotal || 0);
 
-      // Si no se envió subtotal individual o es 0, se calcula dinámicamente
       if (!itemSubtotal || itemSubtotal <= 0) {
         if (mode === 'weight' || mode === 'kg') {
-          // Si el precio viene como $/kg (ej: $2500) y la cantidad en gramos (ej: 250g)
           if (unitPrice > 50 && quantity >= 10) {
             itemSubtotal = (unitPrice / 1000) * quantity;
           } else {
-            // Si el precio ya viene expresado por gramo (ej: $2.5/g * 250g)
             itemSubtotal = unitPrice * quantity;
           }
         } else {
-          // Unidades o porciones
           itemSubtotal = unitPrice * quantity;
         }
       }
@@ -52,7 +50,7 @@ const createOrder = async (req, res) => {
         quantity: quantity,
         mode: mode,
         detailLabel: item.detailLabel || '',
-        subtotal: itemSubtotal // 👈 Guarda el subtotal individual
+        subtotal: itemSubtotal
       };
     });
 
@@ -60,7 +58,6 @@ const createOrder = async (req, res) => {
     let discountAmount = 0;
     let isCashDiscountApplied = false;
 
-    // Descuento del 10% solo si la compra es en efectivo
     if (isCashDiscountActive && method === 'efectivo') {
       discountAmount = calculatedSubtotal * 0.10;
       isCashDiscountApplied = true;
@@ -92,6 +89,59 @@ const createOrder = async (req, res) => {
     });
 
     const createdOrder = await order.save();
+
+    // === DESCUENTO DE STOCK Y VERIFICACIÓN DE ALERTAS ===
+    for (const item of formattedItems) {
+      if (!item.product) continue;
+
+      const product = await Product.findById(item.product);
+      if (!product) continue;
+
+      let isLowStock = false;
+      let currentStockVal = 0;
+      let minStockVal = 0;
+      let unitLabel = '';
+
+      if (item.mode === 'weight' || item.mode === 'kg') {
+        product.stockGrams = Math.max(0, product.stockGrams - item.quantity);
+        product.stock = product.stockGrams;
+        
+        if (product.minStockGrams > 0 && product.stockGrams <= product.minStockGrams) {
+          isLowStock = true;
+          currentStockVal = (product.stockGrams / 1000).toFixed(2);
+          minStockVal = (product.minStockGrams / 1000).toFixed(2);
+          unitLabel = 'kg';
+        }
+      } else if (item.mode === 'porcion') {
+        product.stockPorciones = Math.max(0, product.stockPorciones - item.quantity);
+        product.stock = product.stockPorciones;
+
+        if (product.minStockPorciones > 0 && product.stockPorciones <= product.minStockPorciones) {
+          isLowStock = true;
+          currentStockVal = product.stockPorciones;
+          minStockVal = product.minStockPorciones;
+          unitLabel = 'porción/es';
+        }
+      } else {
+        product.stockUnits = Math.max(0, product.stockUnits - item.quantity);
+        product.stock = product.stockUnits;
+
+        if (product.minStockUnits > 0 && product.stockUnits <= product.minStockUnits) {
+          isLowStock = true;
+          currentStockVal = product.stockUnits;
+          minStockVal = product.minStockUnits;
+          unitLabel = 'unidades';
+        }
+      }
+
+      if (isLowStock && !product.alertSent) {
+        await sendStockAlert(product.name, currentStockVal, minStockVal, unitLabel);
+        product.alertSent = true;
+      }
+
+      await product.save();
+    }
+
     return res.status(201).json(createdOrder);
 
   } catch (error) {
@@ -103,7 +153,6 @@ const createOrder = async (req, res) => {
   }
 };
 
-// 2. Obtener todas las órdenes (con filtros opcionales por rango de fecha y estado)
 const getOrders = async (req, res) => {
   try {
     const { startDate, endDate, status, limit = 100 } = req.query;
@@ -131,7 +180,6 @@ const getOrders = async (req, res) => {
   }
 };
 
-// 3. Obtener detalle de una orden por ID
 const getOrderById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -151,7 +199,6 @@ const getOrderById = async (req, res) => {
   }
 };
 
-// 4. Resumen de caja / ventas diarias
 const getDailySummary = async (req, res) => {
   try {
     const startOfDay = new Date();
@@ -195,7 +242,6 @@ const getDailySummary = async (req, res) => {
   }
 };
 
-// 5. Cancelar / Anular una orden
 const cancelOrder = async (req, res) => {
   try {
     const { id } = req.params;
@@ -222,7 +268,6 @@ const cancelOrder = async (req, res) => {
   }
 };
 
-// Exportación de todas las funciones del controlador
 module.exports = {
   createOrder,
   getOrders,

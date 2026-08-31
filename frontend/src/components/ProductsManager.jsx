@@ -14,7 +14,7 @@ const INITIAL_FORM = {
   priceDozen: '',
   priceKg: '',
   pricePorcion: '',
-  // === NUEVOS CAMPOS DE COSTO (COGS) ===
+  // === CAMPOS DE COSTO (COGS) ===
   cogsUnit: '',
   cogsHalfDozen: '',
   cogsDozen: '',
@@ -22,9 +22,13 @@ const INITIAL_FORM = {
   cogsPorcion: '',
   cogs: '',
   desiredMargin: '',
+  // === STOCKS Y UMBRALES MÍNIMOS ===
   stockUnits: '',
   stockGrams: '',
   stockPorciones: '',
+  minStockUnits: '',
+  minStockGrams: '',
+  minStockPorciones: '',
   image: ''
 };
 
@@ -49,7 +53,6 @@ const ProductsManager = () => {
     setFormData((prev) => {
       const updated = { ...prev, [name]: value };
 
-      // Si modifica costo por docena, se deduce el unitario y media docena automáticamente
       if (name === 'cogsDozen' && numVal > 0) {
         updated.cogsUnit = (numVal / 12).toFixed(2);
         updated.cogsHalfDozen = (numVal / 2).toFixed(2);
@@ -65,7 +68,6 @@ const ProductsManager = () => {
       const costUnit = parseFloat(updated.cogsUnit || updated.cogs) || 0;
       const margin = name === 'desiredMargin' ? numVal : parseFloat(prev.desiredMargin) || 0;
 
-      // Calcular precio sugerido basado en costo unitario y margen
       if (costUnit > 0 && margin > 0) {
         const calculatedPriceUnit = (costUnit * (1 + margin / 100)).toFixed(2);
 
@@ -114,7 +116,10 @@ const ProductsManager = () => {
       desiredMargin: parseFloat(formData.desiredMargin || 0),
       stockUnits: parseFloat(formData.stockUnits || 0),
       stockGrams: parseFloat(formData.stockGrams || 0),
-      stockPorciones: parseFloat(formData.stockPorciones || 0)
+      stockPorciones: parseFloat(formData.stockPorciones || 0),
+      minStockUnits: parseFloat(formData.minStockUnits || 0),
+      minStockGrams: parseFloat(formData.minStockGrams || 0),
+      minStockPorciones: parseFloat(formData.minStockPorciones || 0)
     };
 
     editingId ? await updateProduct(editingId, payload) : await addProduct(payload);
@@ -154,6 +159,9 @@ const ProductsManager = () => {
       stockUnits: p.stockUnits || '',
       stockGrams: p.stockGrams || '',
       stockPorciones: p.stockPorciones || '',
+      minStockUnits: p.minStockUnits || '',
+      minStockGrams: p.minStockGrams || '',
+      minStockPorciones: p.minStockPorciones || '',
       image: p.image || ''
     });
   };
@@ -290,27 +298,49 @@ const ProductsManager = () => {
             )}
           </div>
 
-          <div style={styles.formRow}>
-            {formData.allowByUnit && (
-              <div style={styles.group}>
-                <label style={styles.label}>Stock (Unidades)</label>
-                <input type="number" step="1" name="stockUnits" value={formData.stockUnits} onChange={handleChange} placeholder="Ej. 120" style={styles.input} />
-              </div>
-            )}
+          {/* SECCIÓN DE STOCKS Y MÍNIMOS DE ALERTA */}
+          <div style={{ ...styles.optionsBox, backgroundColor: '#fffba115', borderColor: '#fef08a' }}>
+            <span style={{ ...styles.optionsTitle, color: '#854d0e' }}>Control de Stock y Alertas de WhatsApp:</span>
+            <div style={{ ...styles.formRow, marginTop: '8px' }}>
+              {formData.allowByUnit && (
+                <>
+                  <div style={styles.group}>
+                    <label style={styles.label}>Stock Actual (Un)</label>
+                    <input type="number" step="1" name="stockUnits" value={formData.stockUnits} onChange={handleChange} placeholder="Ej. 120" style={styles.input} />
+                  </div>
+                  <div style={styles.group}>
+                    <label style={{ ...styles.label, color: '#dc2626' }}>⚠️ Stock Mínimo (Un)</label>
+                    <input type="number" step="1" name="minStockUnits" value={formData.minStockUnits} onChange={handleChange} placeholder="Ej. 20" style={{ ...styles.input, borderColor: '#fca5a5' }} />
+                  </div>
+                </>
+              )}
 
-            {formData.allowByWeight && (
-              <div style={styles.group}>
-                <label style={styles.label}>Stock (Gramos)</label>
-                <input type="number" step="1" name="stockGrams" value={formData.stockGrams} onChange={handleChange} placeholder="Ej. 15000" style={styles.input} />
-              </div>
-            )}
+              {formData.allowByWeight && (
+                <>
+                  <div style={styles.group}>
+                    <label style={styles.label}>Stock Actual (Gramos)</label>
+                    <input type="number" step="1" name="stockGrams" value={formData.stockGrams} onChange={handleChange} placeholder="Ej. 15000" style={styles.input} />
+                  </div>
+                  <div style={styles.group}>
+                    <label style={{ ...styles.label, color: '#dc2626' }}>⚠️ Stock Mínimo (Gramos)</label>
+                    <input type="number" step="1" name="minStockGrams" value={formData.minStockGrams} onChange={handleChange} placeholder="Ej. 5000" style={{ ...styles.input, borderColor: '#fca5a5' }} />
+                  </div>
+                </>
+              )}
 
-            {formData.allowByPorcion && (
-              <div style={styles.group}>
-                <label style={styles.label}>Stock (Porciones)</label>
-                <input type="number" step="1" name="stockPorciones" value={formData.stockPorciones} onChange={handleChange} placeholder="Ej. 8" style={styles.input} />
-              </div>
-            )}
+              {formData.allowByPorcion && (
+                <>
+                  <div style={styles.group}>
+                    <label style={styles.label}>Stock Actual (Porciones)</label>
+                    <input type="number" step="1" name="stockPorciones" value={formData.stockPorciones} onChange={handleChange} placeholder="Ej. 8" style={styles.input} />
+                  </div>
+                  <div style={styles.group}>
+                    <label style={{ ...styles.label, color: '#dc2626' }}>⚠️ Stock Mínimo (Porciones)</label>
+                    <input type="number" step="1" name="minStockPorciones" value={formData.minStockPorciones} onChange={handleChange} placeholder="Ej. 2" style={{ ...styles.input, borderColor: '#fca5a5' }} />
+                  </div>
+                </>
+              )}
+            </div>
           </div>
 
           <div style={styles.formRow}>
@@ -342,7 +372,7 @@ const ProductsManager = () => {
                   <th style={styles.th}>Costos (COGS)</th>
                   <th style={styles.th}>Modalidades</th>
                   <th style={styles.th}>Precios</th>
-                  <th style={styles.th}>Stock</th>
+                  <th style={styles.th}>Stock / Alerta</th>
                   <th style={{ ...styles.th, textAlign: 'center' }}>Acciones</th>
                 </tr>
               </thead>
@@ -353,12 +383,21 @@ const ProductsManager = () => {
                   const priceUnit = parseFloat(p.priceUnit || p.priceKg || p.pricePorcion || 0);
                   const margin = costUnit > 0 && priceUnit > 0 ? (((priceUnit - costUnit) / priceUnit) * 100).toFixed(1) : 0;
 
+                  // Evaluar si tiene stock bajo en alguna de las modalidades
+                  const isLowUnits = p.allowByUnit && p.minStockUnits > 0 && (p.stockUnits || 0) <= p.minStockUnits;
+                  const isLowWeight = p.allowByWeight && p.minStockGrams > 0 && (p.stockGrams || 0) <= p.minStockGrams;
+                  const isLowPorcion = p.allowByPorcion && p.minStockPorciones > 0 && (p.stockPorciones || 0) <= p.minStockPorciones;
+                  const isLow = isLowUnits || isLowWeight || isLowPorcion;
+
                   return (
-                    <tr key={prodId} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <tr key={prodId} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: isLow ? '#fef2f2' : 'transparent' }}>
                       <td style={styles.td}>
                         {p.image ? <img src={p.image} alt={p.name} style={styles.tableImg} /> : <div style={styles.noImg}>Sin foto</div>}
                       </td>
-                      <td style={styles.td}><strong>{p.name}</strong></td>
+                      <td style={styles.td}>
+                        <strong>{p.name}</strong>
+                        {isLow && <div style={{ fontSize: '0.68rem', color: '#dc2626', fontWeight: 'bold' }}>⚠️ ¡Stock Crítico!</div>}
+                      </td>
                       <td style={styles.td}>
                         <span style={styles.badgeCat}>{p.category || 'General'}</span>
                         {p.subcategory && <span style={styles.badgeSubCat}>{p.subcategory}</span>}
@@ -390,9 +429,21 @@ const ProductsManager = () => {
                       </td>
                       <td style={styles.td}>
                         <div style={{ fontSize: '0.78rem', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                          {p.allowByUnit && <div>• <strong>{p.stockUnits || 0}</strong> un</div>}
-                          {p.allowByWeight && <div>• <strong>{p.stockGrams || 0}</strong> gr</div>}
-                          {p.allowByPorcion && <div>• <strong>{p.stockPorciones || 0}</strong> porc</div>}
+                          {p.allowByUnit && (
+                            <div style={{ color: isLowUnits ? '#dc2626' : '#334155', fontWeight: isLowUnits ? 'bold' : 'normal' }}>
+                              • {p.stockUnits || 0} un (Mín: {p.minStockUnits || 0})
+                            </div>
+                          )}
+                          {p.allowByWeight && (
+                            <div style={{ color: isLowWeight ? '#dc2626' : '#334155', fontWeight: isLowWeight ? 'bold' : 'normal' }}>
+                              • {p.stockGrams || 0} gr (Mín: {p.minStockGrams || 0})
+                            </div>
+                          )}
+                          {p.allowByPorcion && (
+                            <div style={{ color: isLowPorcion ? '#dc2626' : '#334155', fontWeight: isLowPorcion ? 'bold' : 'normal' }}>
+                              • {p.stockPorciones || 0} porc (Mín: {p.minStockPorciones || 0})
+                            </div>
+                          )}
                         </div>
                       </td>
                       <td style={{ ...styles.td, textAlign: 'center' }}>

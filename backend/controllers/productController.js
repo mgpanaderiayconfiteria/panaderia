@@ -39,6 +39,9 @@ exports.createProduct = async (req, res) => {
       stockUnits,
       stockGrams,
       stockPorciones,
+      minStockUnits,
+      minStockGrams,
+      minStockPorciones,
       image
     } = req.body;
 
@@ -56,14 +59,12 @@ exports.createProduct = async (req, res) => {
     let parsedCogsKg = parseFloat(cogsKg || 0);
     let parsedCogsPorcion = parseFloat(cogsPorcion || 0);
 
-    // Si no enviaron costo unitario pero sí docena/media docena, calculamos el unitario automáticamente
     if (!parsedCogsUnit) {
       if (parsedCogsDozen > 0) parsedCogsUnit = parsedCogsDozen / 12;
       else if (parsedCogsHalfDozen > 0) parsedCogsUnit = parsedCogsHalfDozen / 6;
       else if (cogs) parsedCogsUnit = parseFloat(cogs);
     }
 
-    // Costo general de respaldo (retrocompatibilidad)
     const mainCogs = parsedCogsUnit || (parsedCogsKg ? parsedCogsKg / 1000 : 0) || parsedCogsPorcion || parseFloat(cogs || 0);
     const mainPrice = parsedPriceUnit || parsedPriceHalfDozen || parsedPriceDozen || parsedPriceKg || parsedPricePorcion || 0;
 
@@ -95,7 +96,6 @@ exports.createProduct = async (req, res) => {
       priceKg: parsedPriceKg,
       pricePorcion: parsedPricePorcion,
       price: mainPrice,
-      // Guardar costos específicos
       cogsUnit: parsedCogsUnit,
       cogsHalfDozen: parsedCogsHalfDozen,
       cogsDozen: parsedCogsDozen,
@@ -105,6 +105,9 @@ exports.createProduct = async (req, res) => {
       stockUnits: parseFloat(stockUnits || 0),
       stockGrams: parseFloat(stockGrams || 0),
       stockPorciones: parseFloat(stockPorciones || 0),
+      minStockUnits: parseFloat(minStockUnits || 0),
+      minStockGrams: parseFloat(minStockGrams || 0),
+      minStockPorciones: parseFloat(minStockPorciones || 0),
       stock: primaryStock,
       stockUnit: primaryStockUnit,
       sellType: allowByWeight ? 'peso' : allowByPorcion ? 'porcion' : 'unidad',
@@ -144,7 +147,10 @@ exports.updateProduct = async (req, res) => {
       allowByPorcion,
       stockUnits,
       stockGrams,
-      stockPorciones
+      stockPorciones,
+      minStockUnits,
+      minStockGrams,
+      minStockPorciones
     } = req.body;
 
     const parsedPriceUnit = parseFloat(priceUnit || 0);
@@ -184,6 +190,30 @@ exports.updateProduct = async (req, res) => {
     updateData.cogsKg = parsedCogsKg;
     updateData.cogsPorcion = parsedCogsPorcion;
     updateData.cogs = mainCogs;
+
+    if (minStockUnits !== undefined) updateData.minStockUnits = parseFloat(minStockUnits || 0);
+    if (minStockGrams !== undefined) updateData.minStockGrams = parseFloat(minStockGrams || 0);
+    if (minStockPorciones !== undefined) updateData.minStockPorciones = parseFloat(minStockPorciones || 0);
+
+    // Evaluar la re-activación de la alerta si el stock se repuso por encima del mínimo
+    const currentProd = await Product.findById(id);
+    if (currentProd) {
+      const nextStockUnits = stockUnits !== undefined ? parseFloat(stockUnits) : currentProd.stockUnits;
+      const nextStockGrams = stockGrams !== undefined ? parseFloat(stockGrams) : currentProd.stockGrams;
+      const nextStockPorciones = stockPorciones !== undefined ? parseFloat(stockPorciones) : currentProd.stockPorciones;
+
+      const nextMinUnits = minStockUnits !== undefined ? parseFloat(minStockUnits) : currentProd.minStockUnits;
+      const nextMinGrams = minStockGrams !== undefined ? parseFloat(minStockGrams) : currentProd.minStockGrams;
+      const nextMinPorciones = minStockPorciones !== undefined ? parseFloat(minStockPorciones) : currentProd.minStockPorciones;
+
+      if (
+        (currentProd.allowByUnit && nextMinUnits > 0 && nextStockUnits > nextMinUnits) ||
+        (currentProd.allowByWeight && nextMinGrams > 0 && nextStockGrams > nextMinGrams) ||
+        (currentProd.allowByPorcion && nextMinPorciones > 0 && nextStockPorciones > nextMinPorciones)
+      ) {
+        updateData.alertSent = false;
+      }
+    }
 
     if (allowByUnit) {
       updateData.stock = parseFloat(stockUnits || 0);

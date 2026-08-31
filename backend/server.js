@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 require('dotenv').config();
 
 const User = require('./models/User');
+const { initWhatsApp } = require('./services/whatsappService');
 
 // Importaciones de rutas
 const authRoutes = require('./routes/authRoutes');
@@ -13,7 +14,7 @@ const orderRoutes = require('./routes/orderRoutes');
 const shiftRoutes = require('./routes/shiftRoutes');
 const supplierRoutes = require('./routes/supplierRoutes');
 const purchaseRoutes = require('./routes/purchaseRoutes');
-const expenseRoutes = require('./routes/expenseRoutes'); // 👈 Se agrega la ruta de egresos
+const expenseRoutes = require('./routes/expenseRoutes');
 
 const app = express();
 
@@ -65,7 +66,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/shifts', shiftRoutes);
 app.use('/api', supplierRoutes);
 app.use('/api/purchase-transactions', purchaseRoutes);
-app.use('/api/expenses', expenseRoutes); // 👈 Montado del endpoint de egresos/gastos
+app.use('/api/expenses', expenseRoutes);
 
 // Inicialización del Admin
 const initAdmin = async () => {
@@ -105,6 +106,7 @@ if (!mongoUri) {
     .then(() => {
       console.log('Conexión exitosa a MongoDB Atlas 🍃');
       initAdmin();
+      initWhatsApp();
     })
     .catch(err => console.error('Error al conectar a MongoDB:', err));
 }
