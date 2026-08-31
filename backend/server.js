@@ -5,7 +5,7 @@ require('dotenv').config();
 
 const User = require('./models/User');
 // Importamos las funciones necesarias del servicio de WhatsApp
-const { initWhatsApp, getQrCodeDataUrl, getIsReady } = require('./services/whatsappService');
+const { initWhatsApp, getQrCodeDataUrl, getIsReady, sendStockAlert } = require('./services/whatsappService');
 
 // Importaciones de rutas
 const authRoutes = require('./routes/authRoutes');
@@ -116,6 +116,16 @@ app.get('/qr', (req, res) => {
 // Endpoint auxiliar para verificar el estado de conexión sin recargar manualmente
 app.get('/qr-status', (req, res) => {
   res.json({ isReady: getIsReady() });
+});
+
+// Endpoint para probar el envío directo de alertas por WhatsApp
+app.get('/api/test-whatsapp', async (req, res) => {
+  try {
+    await sendStockAlert('Harina 000 (PRUEBA)', 2, 5, 'Kg');
+    res.json({ message: 'Alerta de prueba enviada a WhatsApp' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Enrutamiento directo de la API
