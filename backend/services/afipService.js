@@ -1,11 +1,26 @@
 const Afip = require('@afipsdk/afip.js');
+const fs = require('fs');
 const path = require('path');
+
+// Obtener clave privada (desde variable de entorno o archivo local)
+const getKey = () => {
+  if (process.env.AFIP_KEY) return process.env.AFIP_KEY;
+  const keyPath = path.join(__dirname, '../certs/privada.key');
+  return fs.existsSync(keyPath) ? fs.readFileSync(keyPath, 'utf8') : '';
+};
+
+// Obtener certificado (desde variable de entorno o archivo local)
+const getCert = () => {
+  if (process.env.AFIP_CERT) return process.env.AFIP_CERT;
+  const certPath = path.join(__dirname, '../certs/certificado.crt');
+  return fs.existsSync(certPath) ? fs.readFileSync(certPath, 'utf8') : '';
+};
 
 const afip = new Afip({
   CUIT: parseInt(process.env.AFIP_CUIT || '20394845125', 10),
   production: process.env.AFIP_PRODUCTION === 'true',
-  key: path.join(__dirname, '../certs/privada.key'),
-  cert: path.join(__dirname, '../certs/certificado.crt')
+  key: getKey(),
+  cert: getCert()
 });
 
 /**
