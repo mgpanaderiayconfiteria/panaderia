@@ -118,7 +118,6 @@ const NuevoCliente = () => {
     } else if (sellMode === 'weight') {
       const val = parseFloat(quantity);
       detailLabel = `${val} gr (${(val / 1000).toFixed(2)} kg)`;
-      // Precio por gramo (ej: 14000 / 1000 = 14)
       calculatedPrice = basePriceKg > 0 ? basePriceKg / 1000 : 0;
     } else if (sellMode === 'portion') {
       const val = parseFloat(quantity);
@@ -128,10 +127,10 @@ const NuevoCliente = () => {
       const amountVal = parseFloat(quantity); 
       
       if (basePriceKg > 0) {
-        finalQty = Math.round((amountVal / basePriceKg) * 1000); // Cantidad en gramos
+        finalQty = Math.round((amountVal / basePriceKg) * 1000);
         finalMode = 'weight';
         detailLabel = `$${amountVal} (${finalQty}g / ${(finalQty / 1000).toFixed(2)} kg)`;
-        calculatedPrice = basePriceKg / 1000; // Precio real por gramo
+        calculatedPrice = basePriceKg / 1000;
       } else {
         detailLabel = `Monto libre ($${amountVal})`;
         calculatedPrice = amountVal;
@@ -148,7 +147,7 @@ const NuevoCliente = () => {
       mode: finalMode,
       quantity: finalQty,
       quantityVal: finalQty,
-      price: calculatedPrice, // FIX: Precio unitario o por gramo real
+      price: calculatedPrice,
       priceKg: basePriceKg,
       detailLabel,
       subtotal: calculatedSubtotal
@@ -268,7 +267,7 @@ const NuevoCliente = () => {
           justify-content: space-between;
           padding: 10px 14px;
           background-color: #ffffff;
-          border-bottom: 1px solid #fca5a5;
+          border-bottom: 1px solid #d1d5db;
         }
 
         .category-bar {
@@ -316,7 +315,7 @@ const NuevoCliente = () => {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          box-shadow: 0 -4px 12px rgba(185, 28, 28, 0.25);
+          box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15);
           z-index: 100;
           cursor: pointer;
           transition: transform 0.1s ease, background-color 0.1s ease;
@@ -362,8 +361,8 @@ const NuevoCliente = () => {
             onClick={() => setActiveTab('catalog')}
             style={{
               ...styles.tabSwitchBtn,
-              backgroundColor: activeTab === 'catalog' ? '#dc2626' : '#fecaca',
-              color: activeTab === 'catalog' ? '#ffffff' : '#7f1d1d'
+              backgroundColor: activeTab === 'catalog' ? '#dc2626' : '#e5e7eb',
+              color: activeTab === 'catalog' ? '#ffffff' : '#374151'
             }}
           >
             🥐 Catálogo
@@ -372,8 +371,8 @@ const NuevoCliente = () => {
             onClick={() => setActiveTab('cart')}
             style={{
               ...styles.tabSwitchBtn,
-              backgroundColor: activeTab === 'cart' ? '#dc2626' : '#fecaca',
-              color: activeTab === 'cart' ? '#ffffff' : '#7f1d1d'
+              backgroundColor: activeTab === 'cart' ? '#dc2626' : '#e5e7eb',
+              color: activeTab === 'cart' ? '#ffffff' : '#374151'
             }}
           >
             🛒 Pedido ({totalItemsCount})
@@ -394,8 +393,8 @@ const NuevoCliente = () => {
                 style={{
                   ...styles.categoryTab,
                   backgroundColor: activeCategory === cat ? '#dc2626' : '#ffffff',
-                  color: activeCategory === cat ? '#ffffff' : '#7f1d1d',
-                  border: activeCategory === cat ? '2px solid #dc2626' : '1px solid #fca5a5'
+                  color: activeCategory === cat ? '#ffffff' : '#374151',
+                  border: activeCategory === cat ? '2px solid #dc2626' : '1px solid #d1d5db'
                 }}
               >
                 {cat}
@@ -412,9 +411,9 @@ const NuevoCliente = () => {
                   onClick={() => setActiveSubcategory(sub)}
                   style={{
                     ...styles.subCategoryTab,
-                    backgroundColor: activeSubcategory === sub ? '#7f1d1d' : '#ffffff',
-                    color: activeSubcategory === sub ? '#ffffff' : '#991b1b',
-                    border: activeSubcategory === sub ? '1px solid #7f1d1d' : '1px solid #fca5a5'
+                    backgroundColor: activeSubcategory === sub ? '#991b1b' : '#ffffff',
+                    color: activeSubcategory === sub ? '#ffffff' : '#374151',
+                    border: activeSubcategory === sub ? '1px solid #991b1b' : '1px solid #d1d5db'
                   }}
                 >
                   {sub}
@@ -431,7 +430,7 @@ const NuevoCliente = () => {
                   {p.image ? <img src={p.image} alt={p.name} style={styles.cardImg} /> : <div style={styles.noCardImg}>🥐</div>}
                   <div style={styles.cardFooter}>
                     <span style={styles.cardTitle}>{p.name}</span>
-                    {p.subcategory && <span style={{ fontSize: '0.65rem', color: '#991b1b', marginTop: '2px' }}>{p.subcategory}</span>}
+                    {p.subcategory && <span style={{ fontSize: '0.65rem', color: '#6b7280', marginTop: '2px' }}>{p.subcategory}</span>}
                   </div>
                 </div>
               );
@@ -454,7 +453,7 @@ const NuevoCliente = () => {
       {activeTab === 'cart' && (
         <div className="cart-tab-view">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <h2 style={{ margin: 0, fontSize: '1.2rem', color: '#7f1d1d' }}>DETALLE DEL PEDIDO</h2>
+            <h2 style={{ margin: 0, fontSize: '1.2rem', color: '#111827' }}>DETALLE DEL PEDIDO</h2>
             <button onClick={() => setActiveTab('catalog')} style={styles.btnAgregarMas}>
               ➕ Agregar más productos
             </button>
@@ -470,10 +469,10 @@ const NuevoCliente = () => {
               cart.map((item) => (
                 <div key={item.id} style={styles.cartItemRow}>
                   <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                    <strong style={{ fontSize: '0.95rem', color: '#7f1d1d' }}>{item.name}</strong>
-                    <span style={{ fontSize: '0.8rem', color: '#991b1b' }}>{item.detailLabel}</span>
+                    <strong style={{ fontSize: '0.95rem', color: '#111827' }}>{item.name}</strong>
+                    <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>{item.detailLabel}</span>
                   </div>
-                  <strong style={{ fontSize: '1.05rem', color: '#dc2626', marginRight: '12px' }}>
+                  <strong style={{ fontSize: '1.05rem', color: '#111827', marginRight: '12px' }}>
                     ${item.subtotal.toFixed(2)}
                   </strong>
                   <button onClick={() => setCart(cart.filter(i => i.id !== item.id))} style={styles.btnDelete}>✕</button>
@@ -521,15 +520,15 @@ const NuevoCliente = () => {
         <div style={styles.modalOverlay}>
           <div style={styles.modalCard}>
             <div style={styles.modalHeader}>
-              <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#7f1d1d' }}>{selectedProduct.name}</h3>
+              <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#111827' }}>{selectedProduct.name}</h3>
               <button onClick={() => setSelectedProduct(null)} style={styles.btnClose}>✕</button>
             </div>
             
             <div style={styles.modeSelectorRow}>
-              <button onClick={() => { setSellMode('weight'); setQuantity(''); }} style={{ ...styles.modeBtn, backgroundColor: sellMode === 'weight' ? '#dc2626' : '#fecaca', color: sellMode === 'weight' ? '#fff' : '#7f1d1d' }}>⚖️ Pesado (Gramos)</button>
-              <button onClick={() => { setSellMode('unit'); setQuantity(''); }} style={{ ...styles.modeBtn, backgroundColor: sellMode === 'unit' ? '#dc2626' : '#fecaca', color: sellMode === 'unit' ? '#fff' : '#7f1d1d' }}>🔢 Unidades</button>
-              <button onClick={() => { setSellMode('portion'); setQuantity(''); }} style={{ ...styles.modeBtn, backgroundColor: sellMode === 'portion' ? '#dc2626' : '#fecaca', color: sellMode === 'portion' ? '#fff' : '#7f1d1d' }}>🍰 Porciones</button>
-              <button onClick={() => { setSellMode('amount'); setQuantity(''); }} style={{ ...styles.modeBtn, backgroundColor: sellMode === 'amount' ? '#dc2626' : '#fecaca', color: sellMode === 'amount' ? '#fff' : '#7f1d1d' }}>💵 Monto $</button>
+              <button onClick={() => { setSellMode('weight'); setQuantity(''); }} style={{ ...styles.modeBtn, backgroundColor: sellMode === 'weight' ? '#dc2626' : '#e5e7eb', color: sellMode === 'weight' ? '#fff' : '#374151' }}>⚖️ Pesado (Gramos)</button>
+              <button onClick={() => { setSellMode('unit'); setQuantity(''); }} style={{ ...styles.modeBtn, backgroundColor: sellMode === 'unit' ? '#dc2626' : '#e5e7eb', color: sellMode === 'unit' ? '#fff' : '#374151' }}>🔢 Unidades</button>
+              <button onClick={() => { setSellMode('portion'); setQuantity(''); }} style={{ ...styles.modeBtn, backgroundColor: sellMode === 'portion' ? '#dc2626' : '#e5e7eb', color: sellMode === 'portion' ? '#fff' : '#374151' }}>🍰 Porciones</button>
+              <button onClick={() => { setSellMode('amount'); setQuantity(''); }} style={{ ...styles.modeBtn, backgroundColor: sellMode === 'amount' ? '#dc2626' : '#e5e7eb', color: sellMode === 'amount' ? '#fff' : '#374151' }}>💵 Monto $</button>
             </div>
 
             <div style={styles.quickPresetsRow}>
@@ -562,10 +561,10 @@ const NuevoCliente = () => {
 
             <div style={styles.subtotalDisplay}>
               <span>Subtotal:</span>
-              <strong style={{ fontSize: '1.4rem', color: '#dc2626' }}>${calculatedSubtotal.toFixed(2)}</strong>
+              <strong style={{ fontSize: '1.4rem', color: '#111827' }}>${calculatedSubtotal.toFixed(2)}</strong>
             </div>
 
-            <button onClick={handleAddToCart} disabled={calculatedSubtotal <= 0} style={{ ...styles.btnAddCart, backgroundColor: calculatedSubtotal <= 0 ? '#fca5a5' : '#dc2626', cursor: calculatedSubtotal <= 0 ? 'not-allowed' : 'pointer' }}>➕ AGREGAR AL PEDIDO</button>
+            <button onClick={handleAddToCart} disabled={calculatedSubtotal <= 0} style={{ ...styles.btnAddCart, backgroundColor: calculatedSubtotal <= 0 ? '#9ca3af' : '#dc2626', cursor: calculatedSubtotal <= 0 ? 'not-allowed' : 'pointer' }}>➕ AGREGAR AL PEDIDO</button>
           </div>
         </div>
       )}
@@ -575,15 +574,15 @@ const NuevoCliente = () => {
         <div style={styles.modalOverlay}>
           <div style={styles.modalCard}>
             <div style={styles.modalHeader}>
-              <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#7f1d1d' }}>COBRO DE PEDIDO</h3>
+              <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#111827' }}>COBRO DE PEDIDO</h3>
               <button onClick={() => setShowCheckoutModal(false)} style={styles.btnClose}>✕</button>
             </div>
 
             {paymentStep === 'select_method' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div style={{ textAlign: 'center', margin: '10px 0' }}>
-                  <span style={{ fontSize: '0.9rem', color: '#991b1b' }}>TOTAL SUBTOTAL</span>
-                  <h1 style={{ margin: 0, fontSize: '2.2rem', color: '#dc2626' }}>${totalCart.toFixed(2)}</h1>
+                  <span style={{ fontSize: '0.9rem', color: '#374151' }}>TOTAL SUBTOTAL</span>
+                  <h1 style={{ margin: 0, fontSize: '2.2rem', color: '#111827' }}>${totalCart.toFixed(2)}</h1>
                 </div>
 
                 <button 
@@ -623,9 +622,9 @@ const NuevoCliente = () => {
                   </div>
                 )}
 
-                <div style={{ ...styles.summaryBox, backgroundColor: '#fef2f2', border: '2px solid #dc2626' }}>
+                <div style={{ ...styles.summaryBox, backgroundColor: '#f9fafb', border: '1px solid #d1d5db' }}>
                   <span style={{ fontWeight: 'bold' }}>TOTAL CON DESCUENTO:</span>
-                  <strong style={{ fontSize: '1.3rem', color: '#dc2626' }}>${finalCashTotal.toFixed(2)}</strong>
+                  <strong style={{ fontSize: '1.3rem', color: '#111827' }}>${finalCashTotal.toFixed(2)}</strong>
                 </div>
 
                 <div style={styles.inputGroup}>
@@ -649,9 +648,9 @@ const NuevoCliente = () => {
                   <button onClick={() => setCashGiven('10000')} style={styles.presetBtn} disabled={isSubmitting}>$10.000</button>
                 </div>
 
-                <div style={{ ...styles.subtotalDisplay, backgroundColor: '#fef2f2' }}>
+                <div style={{ ...styles.subtotalDisplay, backgroundColor: '#f9fafb' }}>
                   <span style={{ fontSize: '1.1rem' }}>VUELTO:</span>
-                  <strong style={{ fontSize: '1.8rem', color: (parseFloat(cashGiven) || 0) < finalCashTotal ? '#991b1b' : '#dc2626' }}>
+                  <strong style={{ fontSize: '1.8rem', color: (parseFloat(cashGiven) || 0) < finalCashTotal ? '#dc2626' : '#111827' }}>
                     ${changeCashAmount.toFixed(2)}
                   </strong>
                 </div>
@@ -666,7 +665,7 @@ const NuevoCliente = () => {
                     style={{
                       ...styles.btnAddCart,
                       flex: 2,
-                      backgroundColor: ((parseFloat(cashGiven) || 0) < finalCashTotal || isSubmitting) ? '#fca5a5' : '#dc2626',
+                      backgroundColor: ((parseFloat(cashGiven) || 0) < finalCashTotal || isSubmitting) ? '#9ca3af' : '#dc2626',
                       cursor: ((parseFloat(cashGiven) || 0) < finalCashTotal || isSubmitting) ? 'not-allowed' : 'pointer'
                     }}
                   >
@@ -679,7 +678,7 @@ const NuevoCliente = () => {
             {/* DETALLES DE PAGO DIGITAL */}
             {paymentStep === 'digital_details' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div style={{ ...styles.summaryBox, backgroundColor: '#eff6ff', border: '2px solid #2563eb' }}>
+                <div style={{ ...styles.summaryBox, backgroundColor: '#eff6ff', border: '1px solid #bfdbfe' }}>
                   <span style={{ fontWeight: 'bold', color: '#1e40af' }}>TOTAL A TRANSFERIR / PAGAR:</span>
                   <strong style={{ fontSize: '1.3rem', color: '#2563eb' }}>${totalCart.toFixed(2)}</strong>
                 </div>
@@ -746,37 +745,37 @@ const styles = {
   tabSwitchBtn: { padding: '8px 12px', borderRadius: '8px', border: 'none', fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer' },
   categoryTab: { padding: '8px 14px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap' },
   subCategoryTab: { padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' },
-  productCard: { backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #ef4444', boxShadow: '0 2px 4px rgba(220, 38, 38, 0.08)', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', overflow: 'hidden', minHeight: '130px' },
+  productCard: { backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #d1d5db', boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', overflow: 'hidden', minHeight: '130px' },
   cardImg: { width: '100%', height: '85px', objectFit: 'cover' },
   noCardImg: { width: '100%', height: '85px', backgroundColor: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem' },
   cardFooter: { padding: '6px', textAlign: 'center', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' },
-  cardTitle: { fontSize: '0.8rem', fontWeight: 'bold', color: '#991b1b', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' },
-  btnVolver: { padding: '8px 12px', borderRadius: '6px', border: '1px solid #ef4444', backgroundColor: '#fff', color: '#991b1b', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem' },
+  cardTitle: { fontSize: '0.8rem', fontWeight: 'bold', color: '#111827', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' },
+  btnVolver: { padding: '8px 12px', borderRadius: '6px', border: '1px solid #d1d5db', backgroundColor: '#fff', color: '#374151', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem' },
   btnVerPedido: { backgroundColor: '#ffffff', color: '#dc2626', border: 'none', padding: '10px 16px', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.9rem', cursor: 'pointer' },
-  btnAgregarMas: { backgroundColor: '#ffffff', border: '1px solid #dc2626', color: '#dc2626', padding: '8px 12px', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer' },
-  cartItemsContainer: { backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #ef4444', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px', minHeight: '200px', maxHeight: '50dvh', overflowY: 'auto' },
-  emptyCart: { padding: '40px 20px', textAlign: 'center', color: '#dc2626', fontSize: '0.9rem' },
-  cartItemRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px', backgroundColor: '#f9fafb', borderRadius: '8px', border: '1px solid #ef4444' },
-  btnDelete: { backgroundColor: '#fee2e2', color: '#991b1b', border: '1px solid #ef4444', borderRadius: '6px', width: '28px', height: '28px', cursor: 'pointer', fontWeight: 'bold' },
-  cartSummaryFooter: { marginTop: '16px', backgroundColor: '#ffffff', padding: '16px', borderRadius: '12px', border: '1px solid #ef4444', display: 'flex', flexDirection: 'column', gap: '8px' },
-  totalRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '1.1rem', fontWeight: 'bold', color: '#7f1d1d' },
-  btnPagarMain: { flex: 2, padding: '14px', backgroundColor: '#dc2626', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer', boxShadow: '0 4px 6px rgba(220, 38, 38, 0.2)' },
-  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '15px' },
-  modalCard: { backgroundColor: '#ffffff', width: '95%', maxWidth: '440px', maxHeight: '90dvh', overflowY: 'auto', borderRadius: '14px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)', borderTop: '5px solid #dc2626' },
-  modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #ef4444', paddingBottom: '8px' },
-  btnClose: { backgroundColor: '#fee2e2', color: '#991b1b', border: '1px solid #ef4444', borderRadius: '6px', width: '30px', height: '30px', cursor: 'pointer', fontWeight: 'bold' },
+  btnAgregarMas: { backgroundColor: '#ffffff', border: '1px solid #d1d5db', color: '#374151', padding: '8px 12px', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.85rem', cursor: 'pointer' },
+  cartItemsContainer: { backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #d1d5db', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px', minHeight: '200px', maxHeight: '50dvh', overflowY: 'auto' },
+  emptyCart: { padding: '40px 20px', textAlign: 'center', color: '#6b7280', fontSize: '0.9rem' },
+  cartItemRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px', backgroundColor: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' },
+  btnDelete: { backgroundColor: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', borderRadius: '6px', width: '28px', height: '28px', cursor: 'pointer', fontWeight: 'bold' },
+  cartSummaryFooter: { marginTop: '16px', backgroundColor: '#ffffff', padding: '16px', borderRadius: '12px', border: '1px solid #d1d5db', display: 'flex', flexDirection: 'column', gap: '8px' },
+  totalRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '1.1rem', fontWeight: 'bold', color: '#111827' },
+  btnPagarMain: { flex: 2, padding: '14px', backgroundColor: '#dc2626', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer', boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)' },
+  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '15px' },
+  modalCard: { backgroundColor: '#ffffff', width: '95%', maxWidth: '440px', maxHeight: '90dvh', overflowY: 'auto', borderRadius: '14px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)', border: '1px solid #d1d5db', borderTop: '5px solid #6b7280' },
+  modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e5e7eb', paddingBottom: '8px' },
+  btnClose: { backgroundColor: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', borderRadius: '6px', width: '30px', height: '30px', cursor: 'pointer', fontWeight: 'bold' },
   modeSelectorRow: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' },
   modeBtn: { padding: '8px', borderRadius: '8px', border: 'none', fontWeight: 'bold', fontSize: '0.8rem', cursor: 'pointer' },
   quickPresetsRow: { display: 'flex', gap: '6px', flexWrap: 'wrap' },
-  presetBtn: { flex: 1, minWidth: '70px', padding: '8px 4px', borderRadius: '6px', border: '1px solid #ef4444', backgroundColor: '#f9fafb', fontSize: '0.75rem', fontWeight: 'bold', color: '#991b1b', cursor: 'pointer' },
+  presetBtn: { flex: 1, minWidth: '70px', padding: '8px 4px', borderRadius: '6px', border: '1px solid #d1d5db', backgroundColor: '#f9fafb', fontSize: '0.75rem', fontWeight: 'bold', color: '#374151', cursor: 'pointer' },
   inputGroup: { display: 'flex', flexDirection: 'column', gap: '4px' },
-  inputLabel: { fontSize: '0.8rem', fontWeight: 'bold', color: '#991b1b' },
-  touchInput: { width: '100%', padding: '10px', fontSize: '1.2rem', fontWeight: 'bold', textAlign: 'center', borderRadius: '8px', border: '2px solid #dc2626', outline: 'none', boxSizing: 'border-box' },
-  subtotalDisplay: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: '8px', border: '1px solid #ef4444', backgroundColor: '#f9fafb' },
+  inputLabel: { fontSize: '0.8rem', fontWeight: 'bold', color: '#374151' },
+  touchInput: { width: '100%', padding: '10px', fontSize: '1.2rem', fontWeight: 'bold', textAlign: 'center', borderRadius: '8px', border: '2px solid #9ca3af', outline: 'none', boxSizing: 'border-box', color: '#111827' },
+  subtotalDisplay: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', backgroundColor: '#f9fafb', color: '#111827' },
   btnAddCart: { width: '100%', padding: '12px', borderRadius: '8px', color: '#fff', fontWeight: 'bold', fontSize: '0.95rem', border: 'none' },
   btnMethodCash: { padding: '14px', backgroundColor: '#dc2626', color: '#fff', fontWeight: 'bold', fontSize: '1rem', borderRadius: '10px', border: 'none', cursor: 'pointer' },
   btnMethodDigital: { padding: '14px', backgroundColor: '#2563eb', color: '#fff', fontWeight: 'bold', fontSize: '1rem', borderRadius: '10px', border: 'none', cursor: 'pointer' },
-  summaryBox: { display: 'flex', justifyContent: 'space-between', backgroundColor: '#f9fafb', padding: '10px', borderRadius: '8px', fontSize: '1rem', border: '1px solid #ef4444' }
+  summaryBox: { display: 'flex', justifyContent: 'space-between', backgroundColor: '#f9fafb', padding: '10px', borderRadius: '8px', fontSize: '1rem', border: '1px solid #d1d5db', color: '#111827' }
 };
 
 export default NuevoCliente;
