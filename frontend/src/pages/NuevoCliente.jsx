@@ -31,10 +31,13 @@ const NuevoCliente = () => {
   const [digitalGiven, setDigitalGiven] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Campos para Facturación Digital Obligatoria (ARCA/AFIP)
+  // Campos para Facturación Digital / Envío por Email
   const [clientEmail, setClientEmail] = useState('');
   const [clientDocNum, setClientDocNum] = useState('');
   const [clientName, setClientName] = useState('');
+
+  // Estado para el modal de éxito con opciones de envío
+  const [completedSaleData, setCompletedSaleData] = useState(null);
 
   useEffect(() => {
     if (categories.length > 0 && !categories.includes(activeCategory)) {
@@ -193,6 +196,7 @@ const NuevoCliente = () => {
     setClientEmail('');
     setClientDocNum('');
     setClientName('');
+    setCompletedSaleData(null);
     setPaymentStep('select_method');
   };
 
@@ -202,7 +206,7 @@ const NuevoCliente = () => {
 
     setIsSubmitting(true);
     try {
-      await addSale({
+      const salePayload = {
         sellerId: user?._id || user?.id,
         sellerName: user?.name || user?.email || 'Empleado Caja',
         sellerRole: user?.role || 'cajero',
@@ -215,11 +219,17 @@ const NuevoCliente = () => {
         paidAmount: given,
         changeAmount: changeCashAmount,
         requiresInvoice: false,
+        clientEmail: clientEmail.trim() || null,
         timestamp: new Date().toISOString()
-      });
+      };
 
-      resetCheckoutState();
-      navigate('/caja');
+      const newSale = await addSale(salePayload);
+
+      setCompletedSaleData({
+        ...salePayload,
+        _id: newSale?._id || Date.now()
+      });
+      setPaymentStep('success_modal');
     } catch (e) {
       alert('Error al procesar la venta en efectivo.');
     } finally {
@@ -233,12 +243,11 @@ const NuevoCliente = () => {
 
     setIsSubmitting(true);
     try {
-      // Regla ARCA/AFIP: Si el operador no coloca datos, se emite a Consumidor Final genérico
       const finalDoc = clientDocNum.trim() || '0';
       const finalName = clientName.trim() || 'Consumidor Final';
       const finalEmail = clientEmail.trim() || null;
 
-      await addSale({
+      const salePayload = {
         sellerId: user?._id || user?.id,
         sellerName: user?.name || user?.email || 'Empleado Caja',
         sellerRole: user?.role || 'cajero',
@@ -250,16 +259,21 @@ const NuevoCliente = () => {
         total: totalCart,
         paidAmount: given,
         changeAmount: changeDigitalAmount,
-        requiresInvoice: true, // FLAG OBLIGATORIO PARA EL BACKEND/AFIP
+        requiresInvoice: true,
         invoiceType: 'C',
         clientEmail: finalEmail,
         clientDocNum: finalDoc,
         clientName: finalName,
         timestamp: new Date().toISOString()
-      });
+      };
 
-      resetCheckoutState();
-      navigate('/caja');
+      const newSale = await addSale(salePayload);
+
+      setCompletedSaleData({
+        ...salePayload,
+        _id: newSale?._id || Date.now()
+      });
+      setPaymentStep('success_modal');
     } catch (e) {
       alert('Error al procesar la venta digital / facturación.');
     } finally {
@@ -587,13 +601,15 @@ const NuevoCliente = () => {
         </div>
       )}
 
-      {/* MODAL COBRO */}
+      {/* MODAL COBRO Y CONFIRMACIÓN */}
       {showCheckoutModal && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalCard}>
             <div style={styles.modalHeader}>
-              <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#111827' }}>COBRO DE PEDIDO</h3>
-              <button onClick={() => setShowCheckoutModal(false)} style={styles.btnClose}>✕</button>
+              <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#111827' }}>
+                {paymentStep === 'success_modal' ? '¡VENTA REGISTRADA!' : 'COBRO DE PEDIDO'}
+              </h3>
+              <button onClick={resetCheckoutState} style={styles.btnClose}>✕</button>
             </div>
 
             {paymentStep === 'select_method' && (
@@ -768,6 +784,37 @@ const NuevoCliente = () => {
                     }}
                   >
                     {isSubmitting ? 'FACTURANDO Y PROCESANDO...' : 'EMITIR FACTURA Y COBRAR'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* MODAL FINAL DE ÉXITO */}
+            {paymentStep === 'success_modal' && completedSaleData && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', textAlign: 'center' }}>
+                <div style={{ fontSize: '3rem', margin: '0 auto' }}>✅</div>
+                <h2 style={{ margin: 0, color: '#166534', fontSize: '1.4rem' }}>¡Cobro exitoso!</h2>
+                
+                <div style={{ backgroundColor: '#f0fdf4', padding: '12px', borderRadius: '8px', border: '1px solid #bbf7d0', textAlign: 'left', fontSize: '0.9rem' }}>
+                  <p style={{ margin: '0 0 6px 0' }}><strong>Monto Total:</strong> ${completedSaleData.total.toFixed(2)}</p>
+                  <p style={{ margin: '0 0 6px 0' }}><strong>Método:</strong> {completedSaleData.paymentMethod.toUpperCase()}</p>
+                  {completedSaleData.requiresInvoice && (
+                    <p style={{ margin: '0 0 6px 0', color: '#2563eb', fontWeight: 'bold' }}>📄 Factura C emitida correctamente</p>
+                  )}
+                  {completedSaleData.clientEmail && (
+                    <p style={{ margin: 0, color: '#166534' }}>✉️ Comprobante enviado a: <strong>{completedSaleData.clientEmail}</strong></p>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
+                  <button
+                    onClick={() => {
+                      resetCheckoutState();
+                      navigate('/caja');
+                    }}
+                    style={{ ...styles.btnAddCart, backgroundColor: '#111827', marginTop: '10px' }}
+                  >
+                    FINALIZAR Y VOLVER A CAJA
                   </button>
                 </div>
               </div>
