@@ -587,7 +587,7 @@ const NuevoCliente = () => {
 
                 <button 
                   onClick={() => {
-                    setCashGiven(finalCashTotal.toString());
+                    setCashGiven('');
                     setPaymentStep('cash_details');
                   }} 
                   style={styles.btnMethodCash}
@@ -597,7 +597,7 @@ const NuevoCliente = () => {
 
                 <button 
                   onClick={() => {
-                    setDigitalGiven(totalCart.toString());
+                    setDigitalGiven('');
                     setPaymentStep('digital_details');
                   }} 
                   style={styles.btnMethodDigital}
