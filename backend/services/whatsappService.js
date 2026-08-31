@@ -14,7 +14,7 @@ const getExecutablePath = () => {
     const pPath = puppeteer.executablePath();
     if (pPath && fs.existsSync(pPath)) return pPath;
   } catch (e) {
-    // Si falla continua
+    // Si falla continua a las rutas por defecto
   }
 
   const linuxPaths = [
@@ -37,10 +37,6 @@ const initWhatsApp = () => {
 
   client = new Client({
     authStrategy: new LocalAuth({ dataPath: authPath }),
-    webVersionCache: {
-      type: 'remote',
-      remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html'
-    },
     puppeteer: {
       headless: true,
       executablePath: getExecutablePath(),
@@ -50,9 +46,10 @@ const initWhatsApp = () => {
         '--disable-dev-shm-usage',
         '--disable-accelerated-2d-canvas',
         '--no-first-run',
-        '--disable-gpu',
         '--no-zygote',
-        '--unhandled-rejections=strict'
+        '--disable-gpu',
+        '--disable-software-rasterizer',
+        '--disable-extensions'
       ]
     }
   });
