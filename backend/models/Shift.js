@@ -5,12 +5,16 @@ const shiftSchema = new mongoose.Schema({
   sellerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   shiftType: { type: String, enum: ['Mañana', 'Tarde', 'Noche'], default: 'Mañana' },
   initialCash: { type: Number, required: true, default: 0 },
-  finalCashCalculated: { type: Number, default: 0 },
   cashSales: { type: Number, default: 0 },
   digitalSales: { type: Number, default: 0 },
+  expectedCash: { type: Number, default: 0 },
+  actualCash: { type: Number, default: 0 },
+  difference: { type: Number, default: 0 },
+  totalRevenue: { type: Number, default: 0 },
+  finalCashCalculated: { type: Number, default: 0 },
   startTime: { type: Date, default: Date.now },
-  endTime: { type: Date },
-  status: { type: String, enum: ['open', 'closed'], default: 'open' }
+  endTime: { type: Date, default: Date.now },
+  status: { type: String, enum: ['open', 'closed'], default: 'closed' }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Shift', shiftSchema);
