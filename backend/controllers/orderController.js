@@ -4,6 +4,7 @@ const Product = require('../models/Product');
 const { sendStockAlert } = require('../services/whatsappService');
 const { emitirFacturaC } = require('../services/afipService');
 const { enviarFacturaEmail } = require('../services/emailService');
+const { generateInvoicePDF } = require('../services/pdfService');
 
 // 1. Crear una nueva orden / venta
 const createOrder = async (req, res) => {
@@ -15,7 +16,7 @@ const createOrder = async (req, res) => {
       paidAmount, 
       seller, 
       employee,
-      // Campos opcionales para la Facturación ARCA / Email
+      requiresInvoice,
       clientEmail,
       clientDocType,
       clientDocNum,
@@ -61,7 +62,7 @@ const createOrder = async (req, res) => {
       };
     });
 
-    const method = paymentMethod || 'efectivo';
+    const method = paymentMethod === 'digital' ? 'digital' : 'efectivo';
     let discountAmount = 0;
     let isCashDiscountApplied = false;
 
@@ -84,7 +85,7 @@ const createOrder = async (req, res) => {
     // === EMISIÓN DE FACTURA ELECTRÓNICA Y ENVÍO POR MAIL ===
     let invoiceInfo = null;
 
-    if (method === 'digital') {
+    if (method === 'digital' || requiresInvoice) {
       try {
         const afipRes = await emitirFacturaC({
           amount: calculatedTotal,
@@ -144,7 +145,7 @@ const createOrder = async (req, res) => {
       let unitLabel = '';
 
       if (item.mode === 'weight' || item.mode === 'kg') {
-        product.stockGrams = Math.max(0, product.stockGrams - item.quantity);
+        product.stockGrams = Math.max(0, (product.stockGrams || 0) - item.quantity);
         product.stock = product.stockGrams;
         
         if (product.minStockGrams > 0 && product.stockGrams <= product.minStockGrams) {
@@ -154,7 +155,7 @@ const createOrder = async (req, res) => {
           unitLabel = 'kg';
         }
       } else if (item.mode === 'porcion') {
-        product.stockPorciones = Math.max(0, product.stockPorciones - item.quantity);
+        product.stockPorciones = Math.max(0, (product.stockPorciones || 0) - item.quantity);
         product.stock = product.stockPorciones;
 
         if (product.minStockPorciones > 0 && product.stockPorciones <= product.minStockPorciones) {
@@ -164,7 +165,7 @@ const createOrder = async (req, res) => {
           unitLabel = 'porción/es';
         }
       } else {
-        product.stockUnits = Math.max(0, product.stockUnits - item.quantity);
+        product.stockUnits = Math.max(0, (product.stockUnits || 0) - item.quantity);
         product.stock = product.stockUnits;
 
         if (product.minStockUnits > 0 && product.stockUnits <= product.minStockUnits) {
@@ -183,7 +184,17 @@ const createOrder = async (req, res) => {
       await product.save();
     }
 
-    // === ESTRUCTURA ENRIQUECIDA PARA EL DASHBOARD ===
+    // === GENERACIÓN DE PDF Y RESPUESTA PARA DASHBOARD ===
+    let pdfBase64 = null;
+    if (requiresInvoice || method === 'digital') {
+      try {
+        const pdfBuffer = await generateInvoicePDF(createdOrder.toObject());
+        pdfBase64 = pdfBuffer.toString('base64');
+      } catch (pdfErr) {
+        console.error('⚠️ Error generando PDF:', pdfErr.message);
+      }
+    }
+
     const createdDate = new Date(createdOrder.createdAt || Date.now());
     const orderObj = createdOrder.toObject();
 
@@ -192,7 +203,8 @@ const createOrder = async (req, res) => {
       sellerName: employeeName,
       cashier: employeeName,
       dateStr: createdDate.toLocaleDateString('es-AR'),
-      timeStr: createdDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+      timeStr: createdDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+      pdfBase64
     };
 
     return res.status(201).json(responseData);
@@ -226,7 +238,6 @@ const getOrders = async (req, res) => {
       .limit(parseInt(limit))
       .populate('seller', 'name email');
 
-    // Mapear ordenes para que el Dashboard siempre tenga dateStr, timeStr y cashier
     const formattedOrders = orders.map(ord => {
       const o = ord.toObject();
       const dt = new Date(o.createdAt);
