@@ -24,37 +24,113 @@ const registerWaste = async (req, res) => {
     }
 
     const numQty = parseFloat(quantity) || 0;
-    const isWeight = product.allowByWeight || reqMode === 'weight';
-    const mode = isWeight ? 'weight' : 'unit';
+
+    // 1. Detección precisa de la modalidad/unidad
+    let mode = 'unit';
+
+    if (
+      reqMode === 'weight' ||
+      reqMode === 'kg' ||
+      reqMode === 'gr' ||
+      product.allowByWeight ||
+      product.stockUnit === 'kg' ||
+      product.stockUnit === 'gr' ||
+      product.unit === 'kg' ||
+      product.unit === 'gr'
+    ) {
+      mode = 'weight';
+    } else if (
+      reqMode === 'porcion' ||
+      product.allowByPorcion ||
+      product.stockUnit === 'porcion'
+    ) {
+      mode = 'porcion';
+    } else if (reqMode === 'dozen') {
+      mode = 'dozen';
+    } else if (reqMode === 'half_dozen') {
+      mode = 'half_dozen';
+    }
 
     let costPrice = 0;
     let totalLoss = 0;
 
-    if (isWeight) {
-      // Cálculo para productos por peso (gramos)
-      const cogsKg = parseFloat(product.cogsKg || product.cogs || 0);
-      costPrice = cogsKg / 1000;
-      totalLoss = numQty * costPrice;
+    // 2. Cálculo de pérdida y descuento de stock según la modalidad
+    switch (mode) {
+      case 'weight': {
+        // En peso, 'numQty' son gramos ingresados desde la caja
+        const cogsKg = parseFloat(product.cogsKg || product.cogs || 0);
+        costPrice = cogsKg / 1000; // Costo por gramo
+        totalLoss = numQty * costPrice;
 
-      // Descuento de stock en gramos
-      if (product.stockGrams !== undefined) {
-        product.stockGrams = Math.max(0, (product.stockGrams || 0) - numQty);
+        // Descuento en stock de gramos
+        if (product.stockGrams !== undefined) {
+          product.stockGrams = Math.max(0, (product.stockGrams || 0) - numQty);
+        }
+        if (product.stock !== undefined) {
+          product.stock = Math.max(0, (product.stock || 0) - numQty);
+        }
+        break;
       }
-      if (product.stock !== undefined) {
-        product.stock = Math.max(0, (product.stock || 0) - numQty);
-      }
-    } else {
-      // Cálculo para productos por unidad
-      const cogsUnit = parseFloat(product.cogsUnit || product.cogs || 0);
-      costPrice = cogsUnit;
-      totalLoss = numQty * costPrice;
 
-      // Descuento de stock en unidades
-      if (product.stockUnits !== undefined) {
-        product.stockUnits = Math.max(0, (product.stockUnits || 0) - numQty);
+      case 'porcion': {
+        const cogsPorcion = parseFloat(product.cogsPorcion || product.cogs || 0);
+        costPrice = cogsPorcion;
+        totalLoss = numQty * costPrice;
+
+        if (product.stockPorciones !== undefined) {
+          product.stockPorciones = Math.max(0, (product.stockPorciones || 0) - numQty);
+        }
+        if (product.stock !== undefined) {
+          product.stock = Math.max(0, (product.stock || 0) - numQty);
+        }
+        break;
       }
-      if (product.stock !== undefined) {
-        product.stock = Math.max(0, (product.stock || 0) - numQty);
+
+      case 'dozen': {
+        const cogsDozen = parseFloat(product.cogsDozen || (product.cogsUnit * 12) || (product.cogs * 12) || 0);
+        costPrice = cogsDozen;
+        totalLoss = numQty * costPrice;
+
+        // Cada docena descuenta 12 unidades
+        const totalUnitsToRemove = numQty * 12;
+        if (product.stockUnits !== undefined) {
+          product.stockUnits = Math.max(0, (product.stockUnits || 0) - totalUnitsToRemove);
+        }
+        if (product.stock !== undefined) {
+          product.stock = Math.max(0, (product.stock || 0) - totalUnitsToRemove);
+        }
+        break;
+      }
+
+      case 'half_dozen': {
+        const cogsHalfDozen = parseFloat(product.cogsHalfDozen || (product.cogsUnit * 6) || (product.cogs * 6) || 0);
+        costPrice = cogsHalfDozen;
+        totalLoss = numQty * costPrice;
+
+        // Cada media docena descuenta 6 unidades
+        const totalUnitsToRemove = numQty * 6;
+        if (product.stockUnits !== undefined) {
+          product.stockUnits = Math.max(0, (product.stockUnits || 0) - totalUnitsToRemove);
+        }
+        if (product.stock !== undefined) {
+          product.stock = Math.max(0, (product.stock || 0) - totalUnitsToRemove);
+        }
+        break;
+      }
+
+      case 'unit':
+      default: {
+        const cogsUnit = parseFloat(product.cogsUnit || product.cogs || 0);
+        costPrice = cogsUnit;
+        totalLoss = numQty * costPrice;
+
+        if (product.stockUnits !== undefined) {
+          product.stockUnits = Math.max(0, (product.stockUnits || 0) - numQty);
+        }
+        if (product.stock !== undefined) {
+          product.stock = Math.max(0, (product.stock || 0) - numQty);
+        }
+        break;
       }
     }
 
