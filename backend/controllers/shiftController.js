@@ -13,11 +13,12 @@ const closeShift = async (req, res) => {
   }
 };
 
-// Registrar merma / sobrante, descontar stock y calcular pérdida en dinero
+// Registrar merma / sobrante leyendo costos/precios del modelo Product de MongoDB
 const registerWaste = async (req, res) => {
   try {
     const { productId, quantity, employee, reason, mode: reqMode } = req.body;
 
+    // Buscar el producto en MongoDB
     const product = await Product.findById(productId);
     if (!product) {
       return res.status(404).json({ message: 'Producto no encontrado en la base de datos' });
@@ -25,9 +26,8 @@ const registerWaste = async (req, res) => {
 
     const numQty = parseFloat(quantity) || 0;
 
-    // 1. Detección precisa de la modalidad/unidad
+    // 1. Determinar modalidad del producto
     let mode = 'unit';
-
     if (
       reqMode === 'weight' ||
       reqMode === 'kg' ||
@@ -39,11 +39,7 @@ const registerWaste = async (req, res) => {
       product.unit === 'gr'
     ) {
       mode = 'weight';
-    } else if (
-      reqMode === 'porcion' ||
-      product.allowByPorcion ||
-      product.stockUnit === 'porcion'
-    ) {
+    } else if (reqMode === 'porcion' || product.allowByPorcion || product.stockUnit === 'porcion') {
       mode = 'porcion';
     } else if (reqMode === 'dozen') {
       mode = 'dozen';
@@ -54,15 +50,17 @@ const registerWaste = async (req, res) => {
     let costPrice = 0;
     let totalLoss = 0;
 
-    // 2. Cálculo de pérdida y descuento de stock según la modalidad
+    // 2. Extraer precios/costos directamente desde la instancia del producto en MongoDB
     switch (mode) {
       case 'weight': {
-        // En peso, 'numQty' son gramos ingresados desde la caja
-        const cogsKg = parseFloat(product.cogsKg || product.cogs || 0);
-        costPrice = cogsKg / 1000; // Costo por gramo
+        // Busca costo por kilo; si no tiene cargado costo (0), usa el precio de venta por kilo
+        const valPerKg = parseFloat(product.cogsKg) || parseFloat(product.cogs) || parseFloat(product.priceKg) || parseFloat(product.price) || 0;
+        
+        // Convertir costo/precio de kilo a gramos
+        costPrice = valPerKg / 1000;
         totalLoss = numQty * costPrice;
 
-        // Descuento en stock de gramos
+        // Descuento de stock en gramos
         if (product.stockGrams !== undefined) {
           product.stockGrams = Math.max(0, (product.stockGrams || 0) - numQty);
         }
@@ -73,8 +71,7 @@ const registerWaste = async (req, res) => {
       }
 
       case 'porcion': {
-        const cogsPorcion = parseFloat(product.cogsPorcion || product.cogs || 0);
-        costPrice = cogsPorcion;
+        costPrice = parseFloat(product.cogsPorcion) || parseFloat(product.cogs) || parseFloat(product.pricePorcion) || parseFloat(product.price) || 0;
         totalLoss = numQty * costPrice;
 
         if (product.stockPorciones !== undefined) {
@@ -87,41 +84,38 @@ const registerWaste = async (req, res) => {
       }
 
       case 'dozen': {
-        const cogsDozen = parseFloat(product.cogsDozen || (product.cogsUnit * 12) || (product.cogs * 12) || 0);
-        costPrice = cogsDozen;
+        const valDozen = parseFloat(product.cogsDozen) || (parseFloat(product.cogsUnit) * 12) || parseFloat(product.priceDozen) || (parseFloat(product.price) * 12) || 0;
+        costPrice = valDozen;
         totalLoss = numQty * costPrice;
 
-        // Cada docena descuenta 12 unidades
-        const totalUnitsToRemove = numQty * 12;
+        const unitsToRemove = numQty * 12;
         if (product.stockUnits !== undefined) {
-          product.stockUnits = Math.max(0, (product.stockUnits || 0) - totalUnitsToRemove);
+          product.stockUnits = Math.max(0, (product.stockUnits || 0) - unitsToRemove);
         }
         if (product.stock !== undefined) {
-          product.stock = Math.max(0, (product.stock || 0) - totalUnitsToRemove);
+          product.stock = Math.max(0, (product.stock || 0) - unitsToRemove);
         }
         break;
       }
 
       case 'half_dozen': {
-        const cogsHalfDozen = parseFloat(product.cogsHalfDozen || (product.cogsUnit * 6) || (product.cogs * 6) || 0);
-        costPrice = cogsHalfDozen;
+        const valHalfDozen = parseFloat(product.cogsHalfDozen) || (parseFloat(product.cogsUnit) * 6) || parseFloat(product.priceHalfDozen) || (parseFloat(product.price) * 6) || 0;
+        costPrice = valHalfDozen;
         totalLoss = numQty * costPrice;
 
-        // Cada media docena descuenta 6 unidades
-        const totalUnitsToRemove = numQty * 6;
+        const unitsToRemove = numQty * 6;
         if (product.stockUnits !== undefined) {
-          product.stockUnits = Math.max(0, (product.stockUnits || 0) - totalUnitsToRemove);
+          product.stockUnits = Math.max(0, (product.stockUnits || 0) - unitsToRemove);
         }
         if (product.stock !== undefined) {
-          product.stock = Math.max(0, (product.stock || 0) - totalUnitsToRemove);
+          product.stock = Math.max(0, (product.stock || 0) - unitsToRemove);
         }
         break;
       }
 
       case 'unit':
       default: {
-        const cogsUnit = parseFloat(product.cogsUnit || product.cogs || 0);
-        costPrice = cogsUnit;
+        costPrice = parseFloat(product.cogsUnit) || parseFloat(product.cogs) || parseFloat(product.priceUnit) || parseFloat(product.price) || 0;
         totalLoss = numQty * costPrice;
 
         if (product.stockUnits !== undefined) {
