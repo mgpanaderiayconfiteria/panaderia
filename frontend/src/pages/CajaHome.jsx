@@ -74,6 +74,7 @@ const CajaHome = () => {
           productId: selectedWasteProd,
           productName: prodObj ? prodObj.name : 'Producto',
           quantity: parseFloat(wasteQty),
+          mode: prodObj?.allowByWeight ? 'weight' : 'unit',
           employee: user?.name || user?.username || 'Cajera',
           reason: 'Sobrante de fin de turno'
         })
@@ -374,13 +375,13 @@ const CajaHome = () => {
               <option value="">-- Seleccionar Producto --</option>
               {products.map((p) => (
                 <option key={p._id || p.id} value={p._id || p.id}>
-                  {p.name} (Stock: {p.stock || 0})
+                  {p.name} (Stock: {p.allowByWeight ? `${((p.stockGrams || p.stock || 0) / 1000).toFixed(2)} kg` : `${p.stockUnits || p.stock || 0} un`})
                 </option>
               ))}
             </select>
             <input
               type="number"
-              placeholder="Cantidad / Kilos a dar de baja"
+              placeholder="Cantidad / Gramos / Unidades a dar de baja"
               value={wasteQty}
               onChange={(e) => setWasteQty(e.target.value)}
               style={styles.inputForm}
