@@ -31,7 +31,7 @@ const NuevoCliente = () => {
   const [digitalGiven, setDigitalGiven] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Campos para Facturación Digital / Envío por Email
+  // Campos opcionales para Email
   const [clientEmail, setClientEmail] = useState('');
   const [clientDocNum, setClientDocNum] = useState('');
   const [clientName, setClientName] = useState('');
@@ -259,8 +259,7 @@ const NuevoCliente = () => {
         total: totalCart,
         paidAmount: given,
         changeAmount: changeDigitalAmount,
-        requiresInvoice: true,
-        invoiceType: 'C',
+        requiresInvoice: false,
         clientEmail: finalEmail,
         clientDocNum: finalDoc,
         clientName: finalName,
@@ -275,7 +274,7 @@ const NuevoCliente = () => {
       });
       setPaymentStep('success_modal');
     } catch (e) {
-      alert('Error al procesar la venta digital / facturación.');
+      alert('Error al procesar la venta digital.');
     } finally {
       setIsSubmitting(false);
     }
@@ -636,7 +635,7 @@ const NuevoCliente = () => {
                   }} 
                   style={styles.btnMethodDigital}
                 >
-                  💳 PAGO DIGITAL (FACTURA C AUTOMÁTICA)
+                  💳 PAGO DIGITAL
                 </button>
               </div>
             )}
@@ -709,52 +708,12 @@ const NuevoCliente = () => {
               </div>
             )}
 
-            {/* DETALLES DE PAGO DIGITAL (FACTURACIÓN OBLIGATORIA) */}
+            {/* DETALLES DE PAGO DIGITAL */}
             {paymentStep === 'digital_details' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div style={{ ...styles.summaryBox, backgroundColor: '#eff6ff', border: '1px solid #bfdbfe' }}>
-                  <span style={{ fontWeight: 'bold', color: '#1e40af' }}>TOTAL A FACTURAR Y PAGAR:</span>
+                  <span style={{ fontWeight: 'bold', color: '#1e40af' }}>TOTAL A PAGAR:</span>
                   <strong style={{ fontSize: '1.3rem', color: '#2563eb' }}>${totalCart.toFixed(2)}</strong>
-                </div>
-
-                <div style={{ backgroundColor: '#f0f9ff', padding: '10px', borderRadius: '8px', border: '1px solid #bae6fd', fontSize: '0.8rem', color: '#0369a1' }}>
-                  ⚡ <strong>Facturación automática:</strong> Si deja los campos vacíos, se emitirá como <strong>Factura C a Consumidor Final</strong>.
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#374151' }}>Nombre / Razón Social (Opcional):</label>
-                    <input
-                      type="text"
-                      placeholder="Consumidor Final"
-                      value={clientName}
-                      onChange={(e) => setClientName(e.target.value)}
-                      style={{ ...styles.touchInput, fontSize: '0.9rem', padding: '8px', textAlign: 'left' }}
-                      disabled={isSubmitting}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#374151' }}>DNI / CUIT (Opcional):</label>
-                    <input
-                      type="text"
-                      placeholder="0 (Sin DNI)"
-                      value={clientDocNum}
-                      onChange={(e) => setClientDocNum(e.target.value)}
-                      style={{ ...styles.touchInput, fontSize: '0.9rem', padding: '8px', textAlign: 'left' }}
-                      disabled={isSubmitting}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#374151' }}>Email para envío de Comprobante (Opcional):</label>
-                    <input
-                      type="email"
-                      placeholder="cliente@ejemplo.com"
-                      value={clientEmail}
-                      onChange={(e) => setClientEmail(e.target.value)}
-                      style={{ ...styles.touchInput, fontSize: '0.9rem', padding: '8px', textAlign: 'left' }}
-                      disabled={isSubmitting}
-                    />
-                  </div>
                 </div>
 
                 <div style={styles.inputGroup}>
@@ -783,7 +742,7 @@ const NuevoCliente = () => {
                       cursor: ((parseFloat(digitalGiven) || 0) < totalCart || isSubmitting) ? 'not-allowed' : 'pointer'
                     }}
                   >
-                    {isSubmitting ? 'FACTURANDO Y PROCESANDO...' : 'EMITIR FACTURA Y COBRAR'}
+                    {isSubmitting ? 'PROCESANDO...' : 'CONFIRMAR Y REGISTRAR'}
                   </button>
                 </div>
               </div>
@@ -798,12 +757,6 @@ const NuevoCliente = () => {
                 <div style={{ backgroundColor: '#f0fdf4', padding: '12px', borderRadius: '8px', border: '1px solid #bbf7d0', textAlign: 'left', fontSize: '0.9rem' }}>
                   <p style={{ margin: '0 0 6px 0' }}><strong>Monto Total:</strong> ${completedSaleData.total.toFixed(2)}</p>
                   <p style={{ margin: '0 0 6px 0' }}><strong>Método:</strong> {completedSaleData.paymentMethod.toUpperCase()}</p>
-                  {completedSaleData.requiresInvoice && (
-                    <p style={{ margin: '0 0 6px 0', color: '#2563eb', fontWeight: 'bold' }}>📄 Factura C emitida correctamente</p>
-                  )}
-                  {completedSaleData.clientEmail && (
-                    <p style={{ margin: 0, color: '#166534' }}>✉️ Comprobante enviado a: <strong>{completedSaleData.clientEmail}</strong></p>
-                  )}
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
