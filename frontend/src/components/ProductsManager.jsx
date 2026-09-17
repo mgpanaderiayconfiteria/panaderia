@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useMemo } from 'react';
 import { ProductContext } from '../context/ProductContext';
 
 const INITIAL_FORM = {
@@ -36,6 +36,11 @@ const ProductsManager = () => {
   const { products, addProduct, updateProduct, deleteProduct } = useContext(ProductContext);
   const [formData, setFormData] = useState(INITIAL_FORM);
   const [editingId, setEditingId] = useState(null);
+
+  // === ESTADOS PARA FILTROS ===
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedSubcategory, setSelectedSubcategory] = useState('');
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -164,6 +169,9 @@ const ProductsManager = () => {
       minStockPorciones: p.minStockPorciones || '',
       image: p.image || ''
     });
+
+    // Desplazar suavemente al formulario para editar
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDelete = async (id) => {
@@ -177,8 +185,38 @@ const ProductsManager = () => {
     setFormData(INITIAL_FORM);
   };
 
+  // === LÓGICA DE FILTRADO Y EXTRACCIÓN DINÁMICA DE CATEGORÍAS ===
+  const categoriesList = useMemo(() => {
+    const cats = products.map((p) => p.category?.trim()).filter(Boolean);
+    return Array.from(new Set(cats)).sort();
+  }, [products]);
+
+  const subcategoriesList = useMemo(() => {
+    const filteredByCat = selectedCategory
+      ? products.filter((p) => p.category?.trim().toLowerCase() === selectedCategory.toLowerCase())
+      : products;
+    const subs = filteredByCat.map((p) => p.subcategory?.trim()).filter(Boolean);
+    return Array.from(new Set(subs)).sort();
+  }, [products, selectedCategory]);
+
+  const filteredProducts = useMemo(() => {
+    return products.filter((p) => {
+      const matchSearch = (p.name || '').toLowerCase().includes(searchQuery.toLowerCase());
+      const matchCat = !selectedCategory || (p.category || '').toLowerCase() === selectedCategory.toLowerCase();
+      const matchSub = !selectedSubcategory || (p.subcategory || '').toLowerCase() === selectedSubcategory.toLowerCase();
+      return matchSearch && matchCat && matchSub;
+    });
+  }, [products, searchQuery, selectedCategory, selectedSubcategory]);
+
+  const handleResetFilters = () => {
+    setSearchQuery('');
+    setSelectedCategory('');
+    setSelectedSubcategory('');
+  };
+
   return (
     <div style={{ width: '100%' }}>
+      {/* FORMULARIO DE PRODUCTO */}
       <div style={styles.card}>
         <h2 style={styles.title}>{editingId ? 'EDITAR PRODUCTO Y COSTOS' : 'ALTA DE PRODUCTO Y CÁLCULO DE MARGEN'}</h2>
         <form onSubmit={handleSubmit} style={styles.formContainer}>
@@ -359,9 +397,73 @@ const ProductsManager = () => {
         </form>
       </div>
 
+      {/* SECCIÓN DEL CATÁLOGO CON FILTROS */}
       <div style={{ ...styles.card, marginTop: '20px' }}>
-        <h2 style={styles.title}>CATÁLOGO COMPLETO DE PRODUCTOS</h2>
-        {products.length === 0 ? <p style={{ color: '#94a3b8', fontSize: '0.85rem' }}>No hay productos cargados.</p> : (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '15px' }}>
+          <h2 style={{ ...styles.title, margin: 0 }}>
+            CATÁLOGO COMPLETO ({filteredProducts.length} de {products.length})
+          </h2>
+          
+          {(searchQuery || selectedCategory || selectedSubcategory) && (
+            <button onClick={handleResetFilters} style={styles.btnResetFilters}>
+              🧹 Limpiar Filtros
+            </button>
+          )}
+        </div>
+
+        {/* BARRA DE BÚSQUEDA Y FILTRADO POR CATEGORÍA Y SUBCATEGORÍA */}
+        <div style={styles.filterBox}>
+          <div style={{ ...styles.group, flex: '2', minWidth: '200px' }}>
+            <label style={styles.label}>🔍 Buscar por nombre</label>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Escribí para buscar..."
+              style={styles.input}
+            />
+          </div>
+
+          <div style={{ ...styles.group, flex: '1', minWidth: '160px' }}>
+            <label style={styles.label}>📁 Categoría</label>
+            <select
+              value={selectedCategory}
+              onChange={(e) => {
+                setSelectedCategory(e.target.value);
+                setSelectedSubcategory('');
+              }}
+              style={styles.select}
+            >
+              <option value="">Todas las categorías</option>
+              {categoriesList.map((cat) => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ ...styles.group, flex: '1', minWidth: '160px' }}>
+            <label style={styles.label}>🏷️ Subcategoría</label>
+            <select
+              value={selectedSubcategory}
+              onChange={(e) => setSelectedSubcategory(e.target.value)}
+              style={styles.select}
+              disabled={subcategoriesList.length === 0}
+            >
+              <option value="">Todas las subcategorías</option>
+              {subcategoriesList.map((sub) => (
+                <option key={sub} value={sub}>{sub}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {products.length === 0 ? (
+          <p style={{ color: '#94a3b8', fontSize: '0.85rem' }}>No hay productos cargados en el sistema.</p>
+        ) : filteredProducts.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '20px', color: '#64748b', fontSize: '0.9rem' }}>
+            🔍 No se encontraron productos que coincidan con la búsqueda o categoría seleccionada.
+          </div>
+        ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={styles.table}>
               <thead>
@@ -377,7 +479,7 @@ const ProductsManager = () => {
                 </tr>
               </thead>
               <tbody>
-                {products.map((p) => {
+                {filteredProducts.map((p) => {
                   const prodId = p._id || p.id;
                   const costUnit = parseFloat(p.cogsUnit || p.cogs || 0);
                   const priceUnit = parseFloat(p.priceUnit || p.priceKg || p.pricePorcion || 0);
@@ -470,6 +572,9 @@ const styles = {
   group: { display: 'flex', flexDirection: 'column', gap: '4px', flex: '1', minWidth: '130px' },
   label: { fontSize: '0.75rem', fontWeight: '600', color: '#475569' },
   input: { padding: '8px 10px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none' },
+  select: { padding: '8px 10px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', backgroundColor: '#fff', cursor: 'pointer' },
+  filterBox: { display: 'flex', gap: '12px', backgroundColor: '#f8fafc', padding: '12px', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '15px', flexWrap: 'wrap' },
+  btnResetFilters: { backgroundColor: '#e2e8f0', color: '#334155', border: 'none', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer' },
   optionsBox: { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', padding: '12px', borderRadius: '6px' },
   optionsTitle: { fontSize: '0.75rem', fontWeight: 'bold', color: '#334155' },
   checkboxLabel: { fontSize: '0.8rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', backgroundColor: '#fff', padding: '4px 8px', borderRadius: '4px', border: '1px solid #cbd5e1' },
