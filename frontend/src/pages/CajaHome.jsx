@@ -1,7 +1,7 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StockCatalog from '../components/StockCatalog';
-import RegistrarIngresoCaja from '../components/RegistrarIngresoCaja'; // Componente de ingreso unificado
+import RegistrarIngresoCaja from '../components/RegistrarIngresoCaja';
 import { SaleContext } from '../context/SaleContext';
 import { AuthContext } from '../context/AuthContext';
 import { ProductContext } from '../context/ProductContext';
@@ -10,7 +10,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const CajaHome = () => {
   const navigate = useNavigate();
-  const { sales, clearSales, setSales } = useContext(SaleContext);
+  const { sales, openCashSession, closeCashSession, currentSession } = useContext(SaleContext);
   const { user, logout } = useContext(AuthContext);
   const { products, fetchProducts } = useContext(ProductContext);
 
@@ -18,23 +18,22 @@ const CajaHome = () => {
   const [showCierreModal, setShowCierreModal] = useState(false);
   const [showAperturaModal, setShowAperturaModal] = useState(false);
   const [showWasteModal, setShowWasteModal] = useState(false);
-  
-  // Estado para desplegar el modal de Ingreso de Proveedor
   const [showIngresoProveedorModal, setShowIngresoProveedorModal] = useState(false);
 
-  // Estado para bloquear múltiples clics accidentales
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [initialCash, setInitialCash] = useState(localStorage.getItem('mg_initial_cash') || '0');
+  const [initialCash, setInitialCash] = useState(currentSession?.initialAmount || localStorage.getItem('mg_initial_cash') || '0');
   const [tempCashInput, setTempCashInput] = useState('');
   const [actualCashInput, setActualCashInput] = useState('');
   const [selectedWasteProd, setSelectedWasteProd] = useState('');
   const [wasteQty, setWasteQty] = useState('');
 
   useEffect(() => {
-    const savedCash = localStorage.getItem('mg_initial_cash');
-    if (!savedCash) setShowAperturaModal(true);
-  }, []);
+    // Si no hay una sesión activa abierta en SaleContext ni monto inicial guardado, solicitar apertura
+    if (!currentSession && !localStorage.getItem('mg_initial_cash')) {
+      setShowAperturaModal(true);
+    }
+  }, [currentSession]);
 
   const totalEfectivoVentas = sales
     ? sales.filter(s => (s.paymentMethod || 'efectivo') === 'efectivo').reduce((acc, s) => acc + (parseFloat(s.total) || 0), 0)
@@ -54,6 +53,12 @@ const CajaHome = () => {
     const cashVal = parseFloat(tempCashInput) || 0;
     setInitialCash(cashVal.toString());
     localStorage.setItem('mg_initial_cash', cashVal.toString());
+
+    // Crear y registrar formalmente la nueva sesión de caja en el contexto
+    if (openCashSession) {
+      openCashSession(cashVal, user);
+    }
+
     setShowAperturaModal(false);
   };
 
@@ -126,13 +131,12 @@ const CajaHome = () => {
       setIsSubmitting(false);
     }
 
-    alert(`Turno cerrado exitosamente.\n\nEfectivo Esperado: $${efectivoEsperadoEnCaja.toFixed(2)}\nEfectivo Real: $${efectivoRealNum.toFixed(2)}\nDiferencia: $${diferenciaCaja.toFixed(2)}`);
-    
-    if (typeof clearSales === 'function') {
-      clearSales();
-    } else if (typeof setSales === 'function') {
-      setSales([]);
+    // Cerrar la sesión en SaleContext (esto limpia las ventas activas y resetea la sesión actual)
+    if (closeCashSession) {
+      closeCashSession(efectivoRealNum, user);
     }
+
+    alert(`Turno cerrado exitosamente.\n\nEfectivo Esperado: $${efectivoEsperadoEnCaja.toFixed(2)}\nEfectivo Real: $${efectivoRealNum.toFixed(2)}\nDiferencia: $${diferenciaCaja.toFixed(2)}`);
     
     localStorage.removeItem('mg_initial_cash');
     localStorage.removeItem('mg_current_shift_sales');
@@ -303,7 +307,6 @@ const CajaHome = () => {
           📉 Cargar Sobrantes
         </button>
 
-        {/* BOTÓN ALTA PROVEEDORES CONECTADO AL MODAL COMPLETO DE INGRESO */}
         <button className="btn-circle btn-red-3" onClick={() => setShowIngresoProveedorModal(true)}>
           🚚 Alta Proveedores
         </button>

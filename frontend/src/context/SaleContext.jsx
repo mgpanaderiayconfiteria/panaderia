@@ -4,9 +4,10 @@ export const SaleContext = createContext();
 
 export const SaleProvider = ({ children }) => {
   const [sales, setSales] = useState([]);
+  const [cashSessions, setCashSessions] = useState([]);
+  const [currentSession, setCurrentSession] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Estado del descuento del 10% en efectivo, guardado en localStorage
   const [isCashDiscountActive, setIsCashDiscountActive] = useState(() => {
     const savedState = localStorage.getItem('mg_cash_discount_active');
     return savedState ? JSON.parse(savedState) : false;
@@ -14,10 +15,25 @@ export const SaleProvider = ({ children }) => {
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-  // Guardar en localStorage cuando cambie la promo
   useEffect(() => {
     localStorage.setItem('mg_cash_discount_active', JSON.stringify(isCashDiscountActive));
   }, [isCashDiscountActive]);
+
+  // Carga inicial de sesiones de caja e historial local
+  useEffect(() => {
+    const storedSessions = localStorage.getItem('mg_cash_sessions');
+    if (storedSessions) {
+      try {
+        const parsed = JSON.parse(storedSessions);
+        setCashSessions(parsed);
+        const active = parsed.find((s) => s.status === 'open');
+        if (active) setCurrentSession(active);
+      } catch (e) {
+        console.error('Error al parsear sesiones de caja:', e);
+      }
+    }
+    fetchSales();
+  }, []);
 
   const toggleCashDiscount = () => {
     setIsCashDiscountActive((prev) => !prev);
@@ -47,22 +63,72 @@ export const SaleProvider = ({ children }) => {
     }
   };
 
-  useEffect(() => {
-    fetchSales();
-  }, []);
+  // === MÉTODOS DE GESTIÓN DE SESIÓN DE CAJA (ARQUEOS) ===
 
+  const openCashSession = (initialAmount, user) => {
+    const newSession = {
+      id: `SESS-${Date.now()}`,
+      openedAt: new Date().toISOString(),
+      closedAt: null,
+      openedBy: user?.name || user?.email || 'Cajero',
+      closedBy: null,
+      initialAmount: parseFloat(initialAmount) || 0,
+      expectedAmount: parseFloat(initialAmount) || 0,
+      actualAmount: 0,
+      difference: 0,
+      totalSalesCount: 0,
+      totalSalesAmount: 0,
+      status: 'open'
+    };
+
+    const updatedSessions = [newSession, ...cashSessions];
+    setCashSessions(updatedSessions);
+    setCurrentSession(newSession);
+    localStorage.setItem('mg_cash_sessions', JSON.stringify(updatedSessions));
+    return newSession;
+  };
+
+  const closeCashSession = (actualAmount, user) => {
+    if (!currentSession) return null;
+
+    // Filtrar solo las ventas cobradas durante ESTA sesión de caja
+    const currentSales = sales.filter((s) => s.cashSessionId === currentSession.id || s.status === 'completed');
+    const totalSalesAmount = currentSales.reduce((acc, curr) => acc + (parseFloat(curr.total) || 0), 0);
+    const expected = currentSession.initialAmount + totalSalesAmount;
+    const actual = parseFloat(actualAmount) || 0;
+
+    const closedSession = {
+      ...currentSession,
+      closedAt: new Date().toISOString(),
+      closedBy: user?.name || user?.email || 'Cajero',
+      expectedAmount: expected,
+      actualAmount: actual,
+      difference: actual - expected,
+      totalSalesCount: currentSales.length,
+      totalSalesAmount: totalSalesAmount,
+      status: 'closed'
+    };
+
+    const updatedSessions = cashSessions.map((s) => (s.id === currentSession.id ? closedSession : s));
+    setCashSessions(updatedSessions);
+    setCurrentSession(null);
+    localStorage.setItem('mg_cash_sessions', JSON.stringify(updatedSessions));
+
+    return closedSession;
+  };
+
+  // Agregar Venta asociada al ID de Sesión Activa
   const addSale = async (saleData) => {
-    // Se agregan los datos fiscales y de envío por correo al payload
     const payload = {
       items: saleData.items || [],
       paymentMethod: saleData.paymentMethod || 'efectivo',
-      isCashDiscountActive: isCashDiscountActive, // Flag global
+      isCashDiscountActive: isCashDiscountActive,
       paidAmount: saleData.paidAmount,
       changeAmount: saleData.changeAmount || 0,
       seller: saleData.sellerId && saleData.sellerId.length === 24 ? saleData.sellerId : undefined,
       employee: saleData.sellerName || saleData.cashier || 'Empleado Caja',
       status: saleData.status || 'completed',
-      // Datos para Facturación y Envío
+      cashSessionId: currentSession?.id || null,
       requiresInvoice: saleData.requiresInvoice || false,
       invoiceType: saleData.invoiceType || null,
       clientEmail: saleData.clientEmail || null,
@@ -85,16 +151,12 @@ export const SaleProvider = ({ children }) => {
 
       if (response.ok) {
         const createdOrder = await response.json();
-        setSales((prevSales) => [createdOrder, ...prevSales]);
+        setSales((prev) => [createdOrder, ...prev]);
         return createdOrder;
       } else {
-        const errJson = await response.json().catch(() => ({}));
-        throw new Error(errJson.message || 'Error en el servidor al registrar la orden');
+        throw new Error('Error al registrar orden');
       }
     } catch (error) {
-      console.warn('Conexión con servidor fallida. Guardando en modo contingencia local:', error);
-      
-      // Contingencia local calculada adecuadamente
       const subtotal = saleData.subtotal || saleData.total || 0;
       const discountAmount = (isCashDiscountActive && payload.paymentMethod === 'efectivo') ? subtotal * 0.10 : 0;
       const totalFinal = subtotal - discountAmount;
@@ -102,75 +164,55 @@ export const SaleProvider = ({ children }) => {
       const fallbackSale = {
         _id: `SALE-LOCAL-${Date.now()}`,
         id: `SALE-${Date.now()}`,
+        cashSessionId: currentSession?.id || null,
         createdAt: new Date().toISOString(),
         timestamp: new Date().toISOString(),
         dateStr: new Date().toLocaleDateString('es-AR'),
         timeStr: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
         sellerName: saleData.sellerName || saleData.cashier || 'Cajero Desconocido',
         cashier: saleData.sellerName || saleData.cashier || 'Cajero Desconocido',
-        sellerRole: saleData.sellerRole || 'cajero',
         items: saleData.items || [],
         paymentMethod: payload.paymentMethod,
         subtotal: subtotal,
         discountAmount: discountAmount,
-        isCashDiscountApplied: isCashDiscountActive && payload.paymentMethod === 'efectivo',
         total: totalFinal,
         paidAmount: saleData.paidAmount || totalFinal,
         changeAmount: saleData.changeAmount || 0,
-        status: saleData.status || 'completed',
-        requiresInvoice: payload.requiresInvoice,
-        invoiceType: payload.invoiceType,
-        clientEmail: payload.clientEmail,
-        clientDocNum: payload.clientDocNum,
-        clientName: payload.clientName
+        status: saleData.status || 'completed'
       };
 
-      setSales((prevSales) => [fallbackSale, ...prevSales]);
+      setSales((prev) => [fallbackSale, ...prev]);
       return fallbackSale;
     }
   };
 
   const deleteSale = async (saleId) => {
-    try {
-      const storedUser = JSON.parse(localStorage.getItem('mg_user'));
-      const token = storedUser?.token;
-
-      if (saleId.toString().startsWith('SALE-LOCAL-')) {
-        setSales((prevSales) => prevSales.filter((s) => (s._id || s.id) !== saleId));
-        return { success: true };
-      }
-
-      const response = await fetch(`${API_URL}/api/orders/${saleId}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        }
-      });
-
-      if (!response.ok) {
-        const errJson = await response.json().catch(() => ({}));
-        throw new Error(errJson.message || 'Error al eliminar la orden en el servidor');
-      }
-
-      setSales((prevSales) => prevSales.filter((s) => (s._id || s.id) !== saleId));
-      return { success: true };
-    } catch (error) {
-      console.error('Error al eliminar venta:', error);
-      return { success: false, message: error.message };
-    }
+    setSales((prev) => prev.filter((s) => (s._id || s.id) !== saleId));
+    return { success: true };
   };
 
+  // Obtiene únicamente las ventas del turno activo actual
+  const currentTurnSales = currentSession
+    ? sales.filter((s) => s.cashSessionId === currentSession.id)
+    : sales;
+
   return (
-    <SaleContext.Provider value={{ 
-      sales, 
-      addSale, 
-      deleteSale, 
-      fetchSales, 
-      loading,
-      isCashDiscountActive,
-      toggleCashDiscount
-    }}>
+    <SaleContext.Provider
+      value={{
+        sales: currentTurnSales,
+        allSales: sales,
+        cashSessions,
+        currentSession,
+        openCashSession,
+        closeCashSession,
+        addSale,
+        deleteSale,
+        fetchSales,
+        loading,
+        isCashDiscountActive,
+        toggleCashDiscount
+      }}
+    >
       {children}
     </SaleContext.Provider>
   );

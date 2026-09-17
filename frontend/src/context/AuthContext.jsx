@@ -71,12 +71,12 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Cierre de sesión centralizado
+  // Cierre de sesión centralizado (mantiene las sesiones de caja históricas)
   const logout = () => {
     setUser(null);
     localStorage.removeItem('mg_user');
     localStorage.removeItem('mg_token');
-    localStorage.removeItem('mg_initial_cash'); // Opcional: elimina también el fondo de caja activo
+    // NOTA: Se conserva 'mg_cash_sessions' para mantener la trazabilidad de cierres entre distintos perfiles.
   };
 
   const value = {
