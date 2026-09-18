@@ -39,6 +39,63 @@ const Login = () => {
 
   return (
     <div style={styles.container}>
+      <style>{`
+        @keyframes gradientBg {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+
+        @keyframes floatOrb1 {
+          0% { transform: translate(0px, 0px) scale(1); }
+          50% { transform: translate(60px, -40px) scale(1.1); }
+          100% { transform: translate(0px, 0px) scale(1); }
+        }
+
+        @keyframes floatOrb2 {
+          0% { transform: translate(0px, 0px) scale(1); }
+          50% { transform: translate(-50px, 50px) scale(1.2); }
+          100% { transform: translate(0px, 0px) scale(1); }
+        }
+
+        .login-bg-animated {
+          background: linear-gradient(-45deg, #0f2337, #1b4332, #2b1117, #0b1829);
+          background-size: 400% 400%;
+          animation: gradientBg 12s ease infinite;
+        }
+
+        .orb-1 {
+          position: absolute;
+          top: 15%;
+          left: 15%;
+          width: 280px;
+          height: 280px;
+          background: radial-gradient(circle, rgba(220, 38, 38, 0.22) 0%, rgba(0,0,0,0) 70%);
+          border-radius: 50%;
+          filter: blur(40px);
+          animation: floatOrb1 10s ease-in-out infinite;
+          pointer-events: none;
+        }
+
+        .orb-2 {
+          position: absolute;
+          bottom: 15%;
+          right: 15%;
+          width: 320px;
+          height: 320px;
+          background: radial-gradient(circle, rgba(27, 67, 50, 0.35) 0%, rgba(0,0,0,0) 70%);
+          border-radius: 50%;
+          filter: blur(50px);
+          animation: floatOrb2 14s ease-in-out infinite;
+          pointer-events: none;
+        }
+      `}</style>
+
+      {/* Orbes de luz animados de fondo */}
+      <div className="orb-1" />
+      <div className="orb-2" />
+
+      {/* Tarjeta de login principal */}
       <div style={styles.card}>
         <div style={styles.logoContainer}>
           <img src="/logo.png" alt="MG Logo" style={styles.logo} />
@@ -90,17 +147,20 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0f2337',
-    padding: '20px'
+    padding: '20px',
+    position: 'relative',
+    overflow: 'hidden'
   },
   card: {
     backgroundColor: '#ffffff',
-    borderRadius: '12px',
+    borderRadius: '16px',
     padding: '40px 30px',
     width: '100%',
     maxWidth: '400px',
-    boxShadow: '0 10px 25px rgba(0, 0, 0, 0.3)',
-    textAlign: 'center'
+    boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4)',
+    textAlign: 'center',
+    zIndex: 10,
+    backdropFilter: 'blur(5px)'
   },
   logoContainer: {
     display: 'flex',
@@ -159,7 +219,7 @@ const styles = {
     fontSize: '0.95rem',
     cursor: 'pointer',
     marginTop: '10px',
-    transition: 'background-color 0.2s'
+    transition: 'background-color 0.2s, transform 0.1s'
   },
   errorBox: {
     backgroundColor: '#fef2f2',
